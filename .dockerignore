@@ -1,0 +1,44 @@
+# Node.js (explicit wildcards to catch all instances)
+**/node_modules
+node_modules
+**/npm-debug.log
+npm-debug.log
+**/dist
+frontend/dist
+pnpm-lock.yaml
+
+# Python (explicit wildcards to catch all instances)
+**/.venv
+.venv
+backend/.venv
+**/venv
+venv
+**/__pycache__
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+**/*.egg-info
+
+# Environment files (never include API keys in Docker images)
+.env
+.env.local
+.env.*.local
+
+# Git and documentation
+.git
+.gitignore
+.gitattributes
+README.md
+ARCHITECTURE.md
+
+# OS and editor
+.DS_Store
+.vscode
+.idea
+Thumbs.db
+*.zip
+
+# Docker
+Dockerfile
+.dockerignore

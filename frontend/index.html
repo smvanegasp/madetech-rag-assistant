@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Handbook GPT</title>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Global Custom Scrollbar - Cleaner, more professional */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    /* Light Theme Scrollbar */
+    body:not(.dark) ::-webkit-scrollbar-thumb {
+      background: #e4e4e7; /* zinc-200 */
+      border-radius: 10px;
+    }
+
+    body:not(.dark) ::-webkit-scrollbar-thumb:hover {
+      background: #d4d4d8; /* zinc-300 */
+    }
+
+    /* Dark Theme Scrollbar */
+    .dark ::-webkit-scrollbar-thumb {
+      background: #27272a; /* zinc-800 */
+      border-radius: 10px;
+    }
+
+    .dark ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46; /* zinc-700 */
+    }
+
+    /* Subtle Thinking Animation dots */
+    @keyframes dot-pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+    .thinking-dot {
+      animation: dot-pulse 1.4s infinite ease-in-out;
+    }
+    .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    .theme-transition {
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+    
+    /* Precision focus states */
+    *:focus-visible {
+      outline: 2px solid #10b981;
+      outline-offset: 2px;
+    }
+
+    /* Prose overrides for more professional text flow */
+    .prose p {
+      margin-top: 1.25em;
+      margin-bottom: 1.25em;
+      line-height: 1.75;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-markdown": "https://esm.sh/react-markdown@^9.0.0",
+    "remark-gfm": "https://esm.sh/remark-gfm@^4.0.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-zinc-50 text-zinc-900 transition-colors duration-300 theme-transition">
+  <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
