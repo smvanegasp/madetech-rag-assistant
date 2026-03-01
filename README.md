@@ -11,3 +11,4 @@ short_description: RAG application for MadeTech handbook
 ---
 
 Hi!
+Sync Trial
