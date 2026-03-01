@@ -1,0 +1,10 @@
+n_documents: 7
+seed: 42
+questions_per_document: 3
+
+# Quality cutoff: records kept only if all critique scores >= this value
+min_filter_score: 4
+
+model: "groq/openai/gpt-oss-20b"
+handbook_path: "backend/data/handbook"
+env_path: "backend/.env"

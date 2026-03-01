@@ -1,0 +1,61 @@
+# ============================================================
+# Research dependencies — covers evaluation, experiments, and
+# exploratory notebooks.
+#
+# Install:
+#   pip install -r research/requirements.txt
+#
+# Also install the local backend package (provides HandbookLoader
+# and HandbookDoc used by data_helpers.py):
+#   pip install -e backend/
+# ============================================================
+
+# ── Core API & config ────────────────────────────────────────
+openai>=1.0.0               # Groq API client (OpenAI-compatible SDK)
+pydantic>=2.0.0             # Structured LLM outputs and data validation
+python-dotenv>=1.0.0        # Load API keys from .env / .env.local
+pyyaml>=6.0.0               # YAML config files
+
+# ── LangChain stack ──────────────────────────────────────────
+langchain>=0.3.0
+langchain-core>=0.3.0       # Base abstractions (transitive, but explicit)
+langchain-openai>=0.2.0     # OpenAI embeddings (text-embedding-3-large/small)
+langchain-community>=0.3.0  # HuggingFace embeddings (all-MiniLM-L6-v2)
+langchain-chroma>=0.1.0     # Chroma vectorstore integration
+langchain-text-splitters>=0.3.0  # RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
+langchain-experimental>=0.3.0   # SemanticChunker
+
+# ── Vector database ──────────────────────────────────────────
+chromadb>=0.5.0
+
+# ── Embedding models ─────────────────────────────────────────
+sentence-transformers>=2.6.0  # Local HuggingFace models (all-MiniLM-L6-v2)
+
+# ── Data & numerics ──────────────────────────────────────────
+numpy>=1.24.0
+pandas>=2.0.0               # Used in utils/visualization.py
+
+# ── Visualisation ────────────────────────────────────────────
+matplotlib>=3.7.0
+seaborn>=0.13.0
+scikit-learn>=1.3.0         # t-SNE in utils/visualization.py
+
+# ── Optional visualisation ───────────────────────────────────
+# umap-learn>=0.5.0         # UMAP 2-D projection (utils/visualization.py)
+#                           # Uncomment if you want UMAP support
+
+# ── LLM routing & retry ──────────────────────────────────────
+litellm>=1.0.0              # Unified LLM completion (query rewriting, LLM reranker)
+tenacity>=8.0.0             # Retry with exponential back-off
+
+# ── Jupyter ──────────────────────────────────────────────────
+ipykernel>=6.0.0            # IPython kernel for Jupyter
+ipywidgets>=8.0.0           # Interactive widgets
+
+# ── Utilities ────────────────────────────────────────────────
+tqdm>=4.66.0                # Progress bars
+
+# ── Web UI ──────────────────────────────────────────────────
+gradio>=4.0.0               # UI for interactive demos and apps
+plotly>=5.0.0               # Interactive data visualization
+nbformat>=5.0.0             # Jupyter notebook format support
