@@ -8,3 +8,6 @@ min_filter_score: 4
 model: "groq/openai/gpt-oss-20b"
 handbook_path: "backend/data/handbook"
 env_path: "backend/.env"
+
+# Maximum output tokens for each QA generation call
+max_tokens: 4096

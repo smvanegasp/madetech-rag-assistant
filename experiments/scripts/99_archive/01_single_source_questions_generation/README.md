@@ -1,3 +1,5 @@
+> **Note:** This script has been superseded by [`00_questions_generation`](../00_questions_generation/README.md), which runs both the single-source and multi-source pipelines in a single execution with a unified configuration. This folder is kept for reference.
+
 # Single-Source Questions Generation
 
 Generates evaluation question pairs from handbook documents for RAG system assessment. Each question is grounded in a single document, scored for relevance, standalone clarity, and groundedness.
@@ -22,6 +24,7 @@ Generates evaluation question pairs from handbook documents for RAG system asses
 | `model` | LLM for QA generation and critique | groq/openai/gpt-oss-20b |
 | `handbook_path` | Path to handbook (relative to project root) | backend/data/handbook |
 | `env_path` | Path to .env for API keys | backend/.env |
+| `max_tokens` | Maximum output tokens per QA generation call | 2048 |
 
 ## How to Run
 

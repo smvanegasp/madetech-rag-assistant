@@ -1,4 +1,4 @@
-"""Entry point for single-source eval question generation."""
+"""Entry point for multi-source eval question generation."""
 
 import logging
 import sys
@@ -13,13 +13,13 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-# Navigate up three levels: 01_single_source_questions_generation -> evaluation
-# -> research -> repo root
+# Navigate up three levels: 02_multi_source_questions_generation -> scripts
+# -> experiments -> repo root
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
-EXPERIMENTS_PATH = SCRIPT_DIR.parent.parent  # research/
+EXPERIMENTS_PATH = SCRIPT_DIR.parent.parent  # experiments/
 BACKEND_PATH = PROJECT_ROOT / "backend"
 
-# Add research/ and backend/ so that "utils.*" imports resolve correctly.
+# Add experiments/ and backend/ so that "utils.*" imports resolve correctly.
 for p in [str(SCRIPT_DIR), str(EXPERIMENTS_PATH), str(BACKEND_PATH)]:
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -34,7 +34,11 @@ from export import (  # noqa: E402
     save_eval_jsonl,
     save_filtered_eval_jsonl,
 )
-from generator import generate_eval_dataset  # noqa: E402
+from generator import (  # noqa: E402
+    build_document_groups,
+    compute_or_load_embeddings,
+    generate_eval_dataset,
+)
 from plots import (  # noqa: E402
     plot_before_after_bar,
     plot_category_before_after_bar,
@@ -50,7 +54,7 @@ from utils.handbook_loader import load_handbook_documents  # noqa: E402
 def setup_logging(log_file: Path) -> logging.Logger:
     """
     Configure the root logger with two handlers:
-      - Console (StreamHandler): INFO and above, concise format.
+      - Console (StreamHandler): WARNING and above, concise format.
       - File (FileHandler):      DEBUG and above, full format including
                                  timestamp, level, and module name.
                                  Written to log_file inside the output dir.
@@ -58,7 +62,7 @@ def setup_logging(log_file: Path) -> logging.Logger:
     Returns the root logger so main() can hold a reference to it.
     """
     root = logging.getLogger()
-    root.setLevel(logging.DEBUG)  # capture everything; handlers filter further
+    root.setLevel(logging.DEBUG)
 
     console_fmt = logging.Formatter("%(levelname)-8s | %(message)s")
     file_fmt = logging.Formatter(
@@ -72,7 +76,8 @@ def setup_logging(log_file: Path) -> logging.Logger:
     console_handler.setLevel(logging.WARNING)
     console_handler.setFormatter(console_fmt)
 
-    # File — DEBUG+ so every LLM call, doc sample, and record detail is captured
+    # File — DEBUG+ so every embedding call, group build, LLM call, and
+    # critique score is captured for post-run inspection.
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(file_fmt)
@@ -99,9 +104,8 @@ def main() -> None:
     config = load_config(config_path)
 
     # --- Output and log directories ---
-    # Each run gets its own timestamped output folder so artefacts never overwrite
-    # each other. Logs go to a shared logs/ folder, one file per run, so they
-    # survive independently of the output folder.
+    # Each run gets its own timestamped output folder so artefacts never
+    # overwrite each other. Logs go to a shared logs/ folder, one file per run.
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = SCRIPT_DIR / "output" / timestamp
     figures_dir = output_dir / "figures"
@@ -111,7 +115,6 @@ def main() -> None:
     logs_dir.mkdir(exist_ok=True)
     log_file = logs_dir / f"{timestamp}.log"
 
-    # Logging is started before any work so the full run is captured.
     logger = setup_logging(log_file)
     logger.debug("Output directory: %s", output_dir)
     logger.debug("Log file: %s", log_file)
@@ -125,8 +128,6 @@ def main() -> None:
         logger.debug("Loaded environment variables from %s", env_file)
     else:
         load_dotenv(override=True)
-        # WARNING is shown on console so the user is alerted to a potential
-        # missing API key before any LLM calls are made.
         logger.warning(
             "Backend .env not found at %s — using default environment", env_file
         )
@@ -136,21 +137,54 @@ def main() -> None:
     documents = load_handbook_documents(handbook_dir)
     logger.debug("Loaded %d handbook documents from %s", len(documents), handbook_dir)
 
-    # --- QA generation + critique ---
-    # Samples n_docs documents, generates questions_per_doc QA pairs each,
-    # then critiques every question on three dimensions (relevance, standalone,
-    # groundedness). This is the most time-consuming step; tqdm bars show progress.
-    eval_records = generate_eval_dataset(
+    # --- Embeddings ---
+    # Embeddings are cached in a .npy file next to the script so subsequent
+    # runs skip the OpenAI call entirely.
+    cache_path = config.embeddings_cache_file(SCRIPT_DIR)
+    vectors = compute_or_load_embeddings(
         documents,
-        n_docs=config.n_documents,
+        cache_path=cache_path,
+        embedding_model=config.embedding_model,
+    )
+    logger.debug(
+        "Embeddings ready: shape=%s, cache=%s", vectors.shape, cache_path
+    )
+
+    # --- Document groups ---
+    # Each group contains an anchor document plus its most similar neighbours.
+    # These groups are the input to the multi-source QA generator.
+    doc_groups = build_document_groups(
+        documents,
+        vectors,
+        k=config.similarity_k,
+        min_sim=config.min_similarity,
+    )
+    logger.debug(
+        "Built %d document groups (K=%d, min_sim=%.2f)",
+        len(doc_groups),
+        config.similarity_k,
+        config.min_similarity,
+    )
+
+    # --- QA generation + critique ---
+    # Samples n_groups document groups, generates questions_per_group QA pairs
+    # from each, then critiques every question on three dimensions (relevance,
+    # standalone, groundedness). This is the most time-consuming step; tqdm
+    # bars show progress.
+    eval_records = generate_eval_dataset(
+        doc_groups,
+        all_documents=documents,
+        n_groups=config.n_groups,
         seed=config.seed,
-        questions_per_doc=config.questions_per_document,
+        questions_per_group=config.questions_per_group,
+        two_docs_ratio=config.two_docs_ratio,
+        max_tokens=config.max_tokens,
         model=config.model,
     )
     logger.debug(
-        "Generated %d eval records from %d sampled documents",
+        "Generated %d eval records from %d sampled document groups",
         len(eval_records),
-        config.n_documents,
+        config.n_groups,
     )
 
     # --- Save outputs ---
@@ -168,7 +202,6 @@ def main() -> None:
     export_eval_markdown(eval_records, output_dir / "eval_questions.md")
 
     # --- Plots ---
-    # Build a separate filtered DataFrame for the before/after comparisons.
     df_filtered = build_eval_dataframe(filtered_records)
 
     plot_before_after_bar(

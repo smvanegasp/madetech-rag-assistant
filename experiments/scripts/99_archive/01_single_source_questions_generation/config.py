@@ -35,6 +35,10 @@ class Config:
     # the project root.
     env_path: str
 
+    # Maximum number of tokens the model may produce in a single QA generation
+    # call. Keeping this bounded avoids runaway token usage on long documents.
+    max_tokens: int
+
     def handbook_dir(self, project_root: Path) -> Path:
         """Resolve handbook directory relative to project root."""
         return project_root / self.handbook_path
@@ -57,4 +61,5 @@ def load_config(config_path: Path) -> Config:
         model=data.get("model", "groq/openai/gpt-oss-20b"),
         handbook_path=data.get("handbook_path", "backend/data/handbook"),
         env_path=data.get("env_path", "backend/.env"),
+        max_tokens=data.get("max_tokens", 2048),
     )

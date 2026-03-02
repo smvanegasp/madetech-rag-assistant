@@ -37,6 +37,7 @@ def generate_qa_pairs_from_single_document(
     document: HandbookDoc,
     num_questions: int = 3,
     model: str = "groq/openai/gpt-oss-20b",
+    max_tokens: int = 2048,
 ) -> List[QAPairWithTS]:
     """
     Generate search-style factoid QA pairs from a single document.
@@ -45,6 +46,7 @@ def generate_qa_pairs_from_single_document(
         document: The document object.
         num_questions: Number of QA pairs to generate.
         model: Model name to use for LLM.
+        max_tokens: Maximum output tokens for the completion call.
 
     Returns:
         List of QAPairWithTS objects with source document metadata.
@@ -71,7 +73,12 @@ def generate_qa_pairs_from_single_document(
         {"role": "user", "content": user_prompt},
     ]
 
-    response = completion(model=model, messages=messages, response_format=QAPairList)
+    response = completion(
+        model=model,
+        messages=messages,
+        response_format=QAPairList,
+        max_tokens=max_tokens,
+    )
     reply = response.choices[0].message.content
 
     # Parse the structured JSON response into QAPairList, then attach source
@@ -182,6 +189,7 @@ def generate_eval_dataset(
     n_docs: int = 10,
     seed: int = 42,
     questions_per_doc: int = 3,
+    max_tokens: int = 2048,
     model: str = "groq/openai/gpt-oss-20b",
 ) -> List[QAPairEvalRecord]:
     """
@@ -192,6 +200,7 @@ def generate_eval_dataset(
         n_docs: Number of documents to sample.
         seed: Random seed for reproducible document sampling.
         questions_per_doc: Number of QA pairs to generate per document.
+        max_tokens: Maximum output tokens per QA generation call.
         model: Model name for QA generation and critique.
 
     Returns:
@@ -213,7 +222,10 @@ def generate_eval_dataset(
         logger.debug("Generating QA pairs from doc '%s' (id=%s)", doc.title, doc.id)
         all_qa_pairs.extend(
             generate_qa_pairs_from_single_document(
-                doc, num_questions=questions_per_doc, model=model
+                doc,
+                num_questions=questions_per_doc,
+                model=model,
+                max_tokens=max_tokens,
             )
         )
     logger.debug("Total QA pairs generated: %d", len(all_qa_pairs))

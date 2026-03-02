@@ -1,0 +1,28 @@
+# Shared parameters — applied to both single-source and multi-source pipelines.
+seed: 42
+min_filter_score: 4
+model: "groq/openai/gpt-oss-20b"
+handbook_path: "backend/data/handbook"
+env_path: "backend/.env"
+max_tokens: 4096
+
+# Single-source pipeline: questions grounded in one document each.
+single_source:
+  n_documents: 4
+  questions_per_document: 3
+
+# Multi-source pipeline: questions requiring synthesis across related documents.
+# Documents are grouped by cosine similarity on OpenAI embeddings; groups with
+# at least two members are then sampled for generation.
+multi_source:
+  n_groups: 3
+  questions_per_group: 5
+  embedding_model: "text-embedding-3-large"
+  # Cache path is relative to the script directory. On first run the embeddings
+  # are computed and saved; subsequent runs load from cache to avoid API cost.
+  embeddings_cache_path: "embeddings_cache.npy"
+  similarity_k: 7
+  min_similarity: 0.3
+  # Probability of using exactly 2 documents (anchor + 1 extra) per generation
+  # call. The remaining probability uses 3 documents (anchor + 2 extra).
+  two_docs_ratio: 0.8
