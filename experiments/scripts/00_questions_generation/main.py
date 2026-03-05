@@ -148,10 +148,10 @@ def main() -> None:
 
     # --- Output and log directories ---
     # Both pipeline phases share the same timestamp so their outputs are
-    # co-located by run under output/single/{timestamp}/ and output/multi/{timestamp}/.
+    # co-located by run under output/{timestamp}/single/ and output/{timestamp}/multi/.
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    single_output_dir = SCRIPT_DIR / "output" / "single" / timestamp
-    multi_output_dir = SCRIPT_DIR / "output" / "multi" / timestamp
+    single_output_dir = SCRIPT_DIR / "output" / timestamp / "single"
+    multi_output_dir = SCRIPT_DIR / "output" / timestamp / "multi"
 
     logs_dir = SCRIPT_DIR / "logs"
     logs_dir.mkdir(exist_ok=True)

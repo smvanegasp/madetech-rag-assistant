@@ -1,6 +1,4 @@
 """Plotting functions for eval question analysis."""
-
-# TODO: include a plot or an annotation in one of the plots that tells me the amount of questions that were evaluated and the amount of questions that passed the evaluation, so I want just the pass rate.
 import logging
 from pathlib import Path
 
@@ -96,6 +94,32 @@ def plot_before_after_bar(
     ax.set_ylabel("Mean Score")
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, title="", frameon=False)
+
+    # Pass-rate annotation: shows evaluated / passed counts and the pass rate so
+    # readers can immediately gauge filter strictness without consulting the CSVs.
+    # Placed inside the plot (top-right) with a light box so it never overlaps the title.
+    n_total = len(df_all)
+    n_passed = len(df_filtered)
+    pass_rate = n_passed / n_total if n_total else 0.0
+    annotation = (
+        f"Evaluated: {n_total}   Passed: {n_passed}   Pass rate: {pass_rate:.0%}"
+    )
+    ax.text(
+        0.98,
+        0.97,
+        annotation,
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=9,
+        color="#555555",
+        bbox=dict(
+            boxstyle="round,pad=0.35",
+            facecolor="white",
+            edgecolor="#CCCCCC",
+            alpha=0.85,
+        ),
+    )
 
     sns.despine()
     plt.tight_layout()
