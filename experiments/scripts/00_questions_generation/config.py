@@ -7,6 +7,18 @@ import yaml
 
 
 @dataclass
+class DatasetSplitConfig:
+    """Proportions for splitting the quality-filtered questions into validation and test sets."""
+
+    # Fraction of filtered questions assigned to the validation set.
+    validation_ratio: float
+
+    # Fraction of filtered questions assigned to the test set.
+    # validation_ratio + test_ratio must equal 1.0.
+    test_ratio: float
+
+
+@dataclass
 class SingleSourceConfig:
     """Parameters specific to the single-source generation pipeline."""
 
@@ -80,6 +92,7 @@ class Config:
     # Pipeline-specific configurations.
     single_source: SingleSourceConfig
     multi_source: MultiSourceConfig
+    dataset_split: DatasetSplitConfig
 
     def handbook_dir(self, project_root: Path) -> Path:
         """Resolve handbook directory relative to project root."""
@@ -97,6 +110,7 @@ def load_config(config_path: Path) -> Config:
 
     single = data.get("single_source", {})
     multi = data.get("multi_source", {})
+    split = data.get("dataset_split", {})
 
     return Config(
         seed=data.get("seed", 42),
@@ -117,5 +131,9 @@ def load_config(config_path: Path) -> Config:
             similarity_k=multi.get("similarity_k", 7),
             min_similarity=multi.get("min_similarity", 0.3),
             two_docs_ratio=multi.get("two_docs_ratio", 0.8),
+        ),
+        dataset_split=DatasetSplitConfig(
+            validation_ratio=split.get("validation_ratio", 0.7),
+            test_ratio=split.get("test_ratio", 0.3),
         ),
     )

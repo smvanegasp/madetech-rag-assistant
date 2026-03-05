@@ -30,6 +30,7 @@ from export import (  # noqa: E402
     build_eval_dataframe,
     export_eval_markdown,
     save_csv,
+    save_dataset_split,
     save_eval_jsonl,
     save_filtered_eval_jsonl,
 )
@@ -98,8 +99,12 @@ def setup_logging(log_file: Path) -> logging.Logger:
 # ---------------------------------------------------------------------------
 
 
-def _save_and_plot(eval_records, output_dir: Path, min_filter_score: int) -> None:
-    """Save all output artefacts and generate analysis plots for one pipeline phase."""
+def _save_and_plot(eval_records, output_dir: Path, min_filter_score: int):
+    """Save all output artefacts and generate analysis plots for one pipeline phase.
+
+    Returns the list of quality-filtered records so the caller can combine them
+    across phases and build the final validation/test split.
+    """
     figures_dir = output_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
@@ -134,6 +139,8 @@ def _save_and_plot(eval_records, output_dir: Path, min_filter_score: int) -> Non
         figures_dir / "scores_distribution.png",
         quality_cutoff=min_filter_score,
     )
+
+    return filtered_records
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +210,7 @@ def main() -> None:
     )
 
     single_output_dir.mkdir(parents=True, exist_ok=True)
-    _save_and_plot(single_records, single_output_dir, config.min_filter_score)
+    single_filtered = _save_and_plot(single_records, single_output_dir, config.min_filter_score)
     logger.debug("Single-source outputs saved to %s", single_output_dir)
 
     # =========================================================================
@@ -255,13 +262,35 @@ def main() -> None:
     )
 
     multi_output_dir.mkdir(parents=True, exist_ok=True)
-    _save_and_plot(multi_records, multi_output_dir, config.min_filter_score)
+    multi_filtered = _save_and_plot(multi_records, multi_output_dir, config.min_filter_score)
     logger.debug("Multi-source outputs saved to %s", multi_output_dir)
 
+    # =========================================================================
+    # Phase 3: Validation / test split
+    # =========================================================================
+    # Combine quality-filtered questions from both phases, shuffle, and write
+    # validation.jsonl and test.jsonl to the run's timestamp root directory.
+
+    all_filtered = single_filtered + multi_filtered
+    run_dir = SCRIPT_DIR / "output" / timestamp
+    n_val, n_test = save_dataset_split(
+        all_filtered,
+        output_dir=run_dir,
+        validation_ratio=config.dataset_split.validation_ratio,
+        seed=config.seed,
+    )
     logger.debug(
-        "Run complete. Single: %d records | Multi: %d records | timestamp: %s",
+        "Dataset split saved to %s (validation=%d, test=%d)", run_dir, n_val, n_test
+    )
+
+    logger.debug(
+        "Run complete. Single: %d records | Multi: %d records | "
+        "Filtered total: %d | Validation: %d | Test: %d | timestamp: %s",
         len(single_records),
         len(multi_records),
+        len(all_filtered),
+        n_val,
+        n_test,
         timestamp,
     )
 

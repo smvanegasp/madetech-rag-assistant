@@ -1,8 +1,10 @@
 """Export eval records to JSONL, CSV, and Markdown."""
 
+import json
 import logging
+import random
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import pandas as pd
 
@@ -138,6 +140,80 @@ def format_eval_record_md(record: QAPairEvalRecord, id: int) -> str:
     lines.append("")
 
     return "\n".join(lines)
+
+
+def _stratified_split(
+    records: List[QAPairEvalRecord],
+    validation_ratio: float,
+    rng: random.Random,
+) -> Tuple[List[QAPairEvalRecord], List[QAPairEvalRecord]]:
+    """
+    Split records into validation and test while preserving the ratio of
+    question_type values (single-source vs multi-source).
+
+    Each stratum is shuffled and split independently, then the two validation
+    halves are combined and re-shuffled, as are the two test halves.
+    """
+    strata: dict[str, List[QAPairEvalRecord]] = {}
+    for r in records:
+        strata.setdefault(r.question_type, []).append(r)
+
+    validation: List[QAPairEvalRecord] = []
+    test: List[QAPairEvalRecord] = []
+
+    for group in strata.values():
+        shuffled = list(group)
+        rng.shuffle(shuffled)
+        split_idx = round(len(shuffled) * validation_ratio)
+        validation.extend(shuffled[:split_idx])
+        test.extend(shuffled[split_idx:])
+
+    rng.shuffle(validation)
+    rng.shuffle(test)
+    return validation, test
+
+
+def save_dataset_split(
+    records: List[QAPairEvalRecord],
+    output_dir: Path,
+    validation_ratio: float,
+    seed: int,
+) -> Tuple[int, int]:
+    """
+    Split quality-filtered records into validation and test sets, preserving the
+    proportion of single-source vs multi-source questions in each set.
+
+    Each line in the output files contains only: question, answer, question_type,
+    and doc_metadata (critiques and other evaluation fields are excluded).
+
+    Returns (n_validation, n_test) for logging.
+    """
+    rng = random.Random(seed)
+    validation_records, test_records = _stratified_split(records, validation_ratio, rng)
+
+    def _serialise(r: QAPairEvalRecord) -> str:
+        return json.dumps({
+            "question": r.question,
+            "answer": r.answer,
+            "question_type": r.question_type,
+            "doc_metadata": [m.model_dump() for m in r.doc_metadata],
+        })
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    validation_path = output_dir / "validation.jsonl"
+    validation_path.write_text(
+        "\n".join(_serialise(r) for r in validation_records), encoding="utf-8"
+    )
+    logger.debug("Saved %d validation records -> %s", len(validation_records), validation_path)
+
+    test_path = output_dir / "test.jsonl"
+    test_path.write_text(
+        "\n".join(_serialise(r) for r in test_records), encoding="utf-8"
+    )
+    logger.debug("Saved %d test records -> %s", len(test_records), test_path)
+
+    return len(validation_records), len(test_records)
 
 
 def export_eval_markdown(records: List[QAPairEvalRecord], path: Path) -> None:
