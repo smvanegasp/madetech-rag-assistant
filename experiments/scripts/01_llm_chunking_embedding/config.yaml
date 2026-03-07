@@ -2,7 +2,7 @@
 
 # Data paths (relative to repo root)
 handbook_path: "backend/data/handbook"
-document_limit: 24  # null = process all; set to int for testing (e.g. 5)
+document_limit: null  # null = process all; set to int for testing (e.g. 5)
 
 # Chunking
 average_chunk_size: 400
@@ -14,7 +14,7 @@ max_tokens: 65536
 
 # Vector store (ChromaDB)
 vector_db:
-  path: "preprocessed_db"
+  path: "output/preprocessed_db"
   collection_name: "docs"
 
 # Embeddings

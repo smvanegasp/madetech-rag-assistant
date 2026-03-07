@@ -44,7 +44,7 @@ Edit `config.yaml` in this directory:
 | `chunking_workers` | Parallel workers for chunking (1 to avoid rate limits) | `3` |
 | `chunking_model` | LLM for chunk generation (e.g. `groq/openai/gpt-oss-20b`) | — |
 | `max_tokens` | Max tokens per LLM response | `65536` |
-| `vector_db.path` | ChromaDB store directory (relative to this script) | `preprocessed_db` |
+| `vector_db.path` | ChromaDB store directory (relative to this script) | `output/preprocessed_db` |
 | `vector_db.collection_name` | ChromaDB collection name | `docs` |
 | `embedding_model` | OpenAI embedding model | `text-embedding-3-large` |
 
@@ -59,5 +59,5 @@ Edit `config.yaml` in this directory:
 
 ## Output
 
-- **ChromaDB** — A persistent vector store in `preprocessed_db/` (or the path in config)
+- **ChromaDB** — A persistent vector store in `output/preprocessed_db/` (or the path in config)
 - Each chunk includes: headline, summary, and original text, plus document metadata (id, title, category)
