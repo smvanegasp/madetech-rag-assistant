@@ -1,0 +1,21 @@
+# LLM chunking and embedding pipeline configuration
+
+# Data paths (relative to repo root)
+handbook_path: "backend/data/handbook"
+document_limit: 24  # null = process all; set to int for testing (e.g. 5)
+
+# Chunking
+average_chunk_size: 400
+chunking_workers: 3  # Set to 1 to avoid rate limits; increase for faster runs
+
+# LLM for chunk generation
+chunking_model: "groq/openai/gpt-oss-20b"
+max_tokens: 65536
+
+# Vector store (ChromaDB)
+vector_db:
+  path: "preprocessed_db"
+  collection_name: "docs"
+
+# Embeddings
+embedding_model: "text-embedding-3-large"

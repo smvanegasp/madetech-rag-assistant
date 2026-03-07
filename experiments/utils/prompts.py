@@ -75,3 +75,28 @@ Examples:
 - "What does the third bullet point mean?" → 1 (refers implicitly to a specific document)
 
 Reply only with your rationale for the rating and your score (1-5), nothing else."""
+
+CHUNK_GENERATION_SYSTEM_PROMPT = """You are a chunking expert for a RAG-based company chatbot.
+You will be given a company handbook document from Made Tech, along with its metadata (id, title, category).
+Your task is to split the document into overlapping chunks suitable for building a Knowledge Base.
+Employees will query the chatbot to find answers from these chunks.
+
+Guidelines:
+- Divide the entire document into logical chunks. Ensure that every part of the document is included in at least one chunk—do not omit any text.
+- Chunks should overlap by approximately 25% or around 50 words, so that important information is present in multiple chunks to aid retrieval.
+- Aim for a set of chunks that both cover the full document and enable answering specific, focused questions. Use as many chunks as needed for clarity and answerability.
+- For each chunk, provide:
+    - A brief headline (a few words describing the main topic of the chunk).
+    - A concise summary (a few sentences that capture the key points of the chunk).
+    - The original text for that chunk (copied verbatim from the provided document).
+
+Reply only with the list of chunks, in the required format, and nothing else."""
+
+
+# This document should probably be split into at least {how_many} chunks, but you can have more or less as appropriate, ensuring that there are individual chunks to answer specific questions.
+# # There should be overlap between the chunks as appropriate; typically about 25% overlap or about 50 words, so you have the same text in multiple chunks for best retrieval results.
+# Here is the document:
+
+# {document["text"]}
+
+# Respond with the chunks.
