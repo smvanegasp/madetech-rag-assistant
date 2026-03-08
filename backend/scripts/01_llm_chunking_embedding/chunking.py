@@ -6,6 +6,7 @@ from multiprocessing import Pool
 from litellm import completion
 from tenacity import retry, wait_exponential
 from tqdm import tqdm
+
 from utils.models import Chunks, HandbookDoc, Result
 from utils.prompts import CHUNK_GENERATION_SYSTEM_PROMPT
 
