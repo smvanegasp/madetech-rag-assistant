@@ -36,10 +36,15 @@ def save_plots(
     """
     Save summary plots to the output directory.
 
+    Summary:
     - summary_scores.png: Bar chart of mean accuracy/completeness/relevance by experiment
     - summary_scores_median.png: Bar chart of median accuracy/completeness/relevance by experiment
     - by_question_type.png: Mean scores by question type for the best experiment
     - by_question_type_median.png: Median scores by question type for the best experiment
+
+    Distributions:
+    - distribution_histograms.png: Histograms per metric, faceted by experiment
+    - distribution_ecdf.png: Empirical CDF per experiment
     """
     output_dir = Path(output_dir) if not isinstance(output_dir, Path) else output_dir
 
@@ -186,4 +191,86 @@ def save_plots(
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True)
     plt.tight_layout()
     fig.savefig(output_dir / "by_question_type_median.png", dpi=150, bbox_inches="tight")
+    plt.close()
+
+    # Build long-format dataframe for distribution plots
+    dist_rows = []
+    for exp_name, records in all_results.items():
+        for r in records:
+            for m, label in zip(
+                ["accuracy", "completeness", "relevance"],
+                ["Accuracy", "Completeness", "Relevance"],
+            ):
+                val = r.get(m)
+                if val is not None:
+                    dist_rows.append({
+                        "experiment": exp_name,
+                        "question_type": r.get("question_type", "unknown"),
+                        "Metric": label,
+                        "Score": val,
+                    })
+    df_dist = pd.DataFrame(dist_rows)
+    if df_dist.empty:
+        return
+
+    sns.set_theme(style="whitegrid", font_scale=1.1)
+
+    # 5. Histograms per metric, faceted by experiment (METRIC_PALETTE + bar labels)
+    metric_order = ["Accuracy", "Completeness", "Relevance"]
+    g = sns.FacetGrid(
+        df_dist,
+        col="experiment",
+        row="Metric",
+        sharex=True,
+        sharey=True,
+        margin_titles=True,
+        height=2.5,
+        aspect=1.2,
+        row_order=metric_order,
+    )
+    g.map_dataframe(sns.histplot, x="Score", bins=range(0, 7), discrete=True, kde=False)
+    g.set_titles(col_template="{col_name}", row_template="{row_name}")
+    g.fig.suptitle("Score histograms by experiment and metric", fontsize=14, fontweight="bold", y=1.02)
+
+    # Apply METRIC_PALETTE and add count labels in the middle of each bar
+    for row_idx, metric in enumerate(metric_order):
+        color = METRIC_PALETTE[metric]
+        for col_idx in range(g.axes.shape[1]):
+            ax = g.axes[row_idx, col_idx]
+            for patch in ax.patches:
+                patch.set_facecolor(color)
+            for patch in ax.patches:
+                h = patch.get_height()
+                if h > 0:
+                    ax.annotate(
+                        f"{int(h)}",
+                        xy=(patch.get_x() + patch.get_width() / 2, patch.get_y() + h / 2),
+                        ha="center",
+                        va="center",
+                        fontsize=8,
+                        fontweight="bold",
+                        color="white",
+                    )
+    plt.tight_layout()
+    g.fig.savefig(output_dir / "distribution_histograms.png", dpi=150, bbox_inches="tight")
+    plt.close()
+
+    # 6. Empirical CDF per experiment
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5), sharex=True, sharey=True)
+    for ax, metric in zip(axes, ["Accuracy", "Completeness", "Relevance"]):
+        subset = df_dist[df_dist["Metric"] == metric]
+        for exp in df_dist["experiment"].unique():
+            scores = subset[subset["experiment"] == exp]["Score"].sort_values()
+            if len(scores) > 0:
+                y = np.arange(1, len(scores) + 1) / len(scores)
+                ax.step(np.concatenate([[0], scores, [6]]), np.concatenate([[0], y, [1]]), label=exp, where="post")
+        ax.set_title(metric, fontsize=12, fontweight="bold")
+        ax.set_xlabel("Score")
+        ax.set_ylabel("Cumulative proportion")
+        ax.set_xlim(0, 6)
+        ax.set_ylim(0, 1.05)
+        ax.legend(loc="lower right", fontsize=7)
+    fig.suptitle("Empirical CDF: cumulative proportion of questions at or below each score", fontsize=12, fontweight="bold", y=1.02)
+    plt.tight_layout()
+    fig.savefig(output_dir / "distribution_ecdf.png", dpi=150, bbox_inches="tight")
     plt.close()
