@@ -21,11 +21,6 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   sources?: SourceChunk[];
-  /** 
-   * highlights: Map of docId to an array of verbatim strings 
-   * found to be relevant to this specific answer. 
-   */
-  highlights?: Record<string, string[]>;
   timestamp: Date;
 }
 

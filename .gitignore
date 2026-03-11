@@ -368,3 +368,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+#----------------------------------------------------------
+# Experiments .gitignore
+#----------------------------------------------------------
+
+experiments_db/
+output/

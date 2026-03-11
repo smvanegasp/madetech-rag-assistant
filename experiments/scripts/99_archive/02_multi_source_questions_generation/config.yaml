@@ -1,0 +1,30 @@
+n_groups: 7
+seed: 42
+questions_per_group: 5
+
+# Quality cutoff: records kept only if all critique scores >= this value
+min_filter_score: 4
+
+model: "groq/openai/gpt-oss-20b"
+handbook_path: "backend/data/handbook"
+env_path: "backend/.env"
+
+# Embedding model used to compute document similarity
+embedding_model: "text-embedding-3-large"
+
+# Path to the embeddings cache file, relative to the script directory.
+# If the file exists it is loaded directly; otherwise embeddings are
+# computed via the OpenAI API and saved here for future runs.
+embeddings_cache_path: "embeddings_cache.npy"
+
+# Top-K most similar neighbours to retrieve for each anchor document
+similarity_k: 7
+
+# Minimum cosine similarity for a neighbour to be included in a group
+min_similarity: 0.3
+
+# Probability of using 2 documents total (anchor + 1 extra) vs 3 (anchor + 2)
+two_docs_ratio: 0.8
+
+# Maximum output tokens for each QA generation call
+max_tokens: 4096

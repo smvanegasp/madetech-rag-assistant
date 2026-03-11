@@ -1,0 +1,18 @@
+# Advanced RAG pipeline configuration
+# Uses ChromaDB from 01_llm_chunking_embedding for retrieval
+
+# Vector store (ChromaDB) — path relative to 01_llm_chunking_embedding script dir
+vector_db:
+  path: "../../../backend/data/vector_db"
+  collection_name: "docs"
+
+# Embeddings (must match the model used in 01_llm_chunking_embedding)
+embedding_model: "text-embedding-3-large"
+
+# Retrieval parameters
+retrieval:
+  retrieval_k: 10   # Number of chunks to retrieve per query (original + rewritten)
+  final_k: 7        # Number of chunks to pass to the LLM after reranking
+
+# LLM models
+model: "groq/openai/gpt-oss-20b"  # For query rewriting, reranking, and answer generation

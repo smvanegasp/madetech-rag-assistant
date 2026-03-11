@@ -1,0 +1,61 @@
+# Rerank/Rewrite experiment configuration
+# Evaluates RAG variants with LLM-as-judge (accuracy, completeness, relevance)
+# Uses questions from 00_questions_generation output
+
+# Path to questions — "latest" uses the most recent timestamp folder
+questions:
+  source: "../00_questions_generation/output"
+  use_latest: true   # If true, auto-detect latest timestamp folder
+  # Or specify a timestamp explicitly, e.g. "2025-03-07_12-30-45"
+  # timestamp: null
+  files:
+    - "test.jsonl"   # Evaluation questions (QAPairWithTS format)
+  n_questions: null       # null = use all questions; int = random sample
+  random_seed: 42         # For reproducible sampling when n_questions is set
+
+# Vector store (ChromaDB) — path relative to this script's directory
+vector_db:
+  path: "../../../backend/data/vector_db"
+  collection_name: "docs"
+
+# Embeddings (must match the model used in 01_llm_chunking_embedding)
+embedding_model: "text-embedding-3-large"
+
+# Retrieval parameters
+retrieval:
+  retrieval_k: 20   # Chunks to retrieve per query (original + rewritten)
+  final_k: 10      # Chunks to pass to LLM after reranking
+
+# LLM for RAG (query rewriting, reranking, answer generation) and for judge
+model: "groq/openai/gpt-oss-20b"
+
+# Experiment variants: each runs with different use_query_rewriting / use_reranking
+experiments:
+  # - name: "basic_rag"
+  #   use_query_rewriting: false
+  #   use_reranking: false
+
+  # - name: "with_reranking"
+  #   use_query_rewriting: false
+  #   use_reranking: true
+
+  # - name: "with_rewriting"
+  #   use_query_rewriting: true
+  #   use_reranking: false
+
+  - name: "with_rewriting_and_reranking"
+    use_query_rewriting: true
+    use_reranking: true
+
+# Parallel workers for question evaluation (1 = sequential)
+workers: 3
+
+# Output directory for results (relative to this script)
+output: "output"
+
+# Optional: load previous run instead of re-running (path to timestamp folder)
+# e.g. "output/2026-03-08_12-00-00" (null = run from scratch)
+load_from: null
+
+# Generate plots after run (bar chart, by question_type)
+save_plots: true
