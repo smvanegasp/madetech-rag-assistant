@@ -1,20 +1,21 @@
 """
-@file app.py
-@description FastAPI application serving the RAG handbook backend.
+FastAPI application for the RAG handbook backend.
 
-This is the main application entry point that orchestrates the entire backend system.
-It provides REST API endpoints for chat, document highlighting, and static file serving.
+Entry point for the backend. Exposes REST API and (in production) serves the frontend.
 
-Architecture:
-- Chat responses: Uses RAGService (Groq + ChromaDB) for semantic search
-- Highlights: Uses Groq service for precise text extraction
-- Frontend: Serves built React app in production (Docker)
+API Endpoints:
+- GET  /api/health     — Health check and document count
+- GET  /api/handbook   — All handbook documents (for source viewer)
+- POST /api/chat       — RAG chat (query + history → answer + sources)
+- POST /api/highlights — AI-powered phrase highlighting in documents
+
+Request flow:
+  /api/chat → RAGService.get_rag_response() → rag.pipeline.answer_question()
+  /api/highlights → highlights_service.get_relevance_highlights()
 
 Required environment variables:
-- GROQ_API_KEY: For primary LLM (chat and highlighting)
-- OPENAI_API_KEY: For embeddings and fallback LLM
-- GEMINI_API_KEY: For fallback highlighting (optional)
-- FRONTEND_PATH: Path to built frontend (optional, defaults to /app/frontend/dist)
+- GROQ_API_KEY, OPENAI_API_KEY
+- FRONTEND_PATH (optional, for production static serving)
 """
 
 import os
@@ -25,12 +26,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 
-from .models import (
-    ChatRequest, ChatResponse, 
-    HighlightsRequest, HighlightsResponse,
-    HandbookDoc
+from utils.models import (
+    ChatRequest,
+    ChatResponse,
+    HandbookDoc,
+    HighlightsRequest,
+    HighlightsResponse,
 )
-from .groq_service import get_relevance_highlights
+from .config_loader import load_config
+from .highlights_service import get_relevance_highlights
 from .handbook_loader import load_handbook_documents
 from .rag_service import RAGService
 
@@ -80,12 +84,10 @@ async def startup_event():
         handbook_docs = load_handbook_documents()
         print(f"✓ Loaded {len(handbook_docs)} handbook documents")
         
-        # Initialize RAG service with vector database
-        # Vector DB must exist at backend/data/vector_db/ (created by scripts/ingest.py)
-        import os
-        vector_db_path = os.path.join(os.path.dirname(__file__), "..", "data", "vector_db")
-        rag_service = RAGService(vector_db_path=vector_db_path)
-        print(f"✓ RAG service initialized with Groq LLM and ChromaDB at {vector_db_path}")
+        # Initialize RAG service with config (config.yaml in backend/)
+        # Vector DB path comes from config; defaults to backend/data/vector_db
+        config = load_config()
+        rag_service = RAGService(config=config)
     except Exception as e:
         print(f"✗ Error during startup: {e}")
         raise
@@ -180,7 +182,7 @@ async def get_highlights(request: HighlightsRequest):
     a source document, they can request AI-powered highlighting to see which
     specific phrases support the chatbot's previous answer.
     
-    Uses Groq for fast inference with Gemini as fallback for reliability.
+    Uses Groq for fast inference with OpenAI as fallback for reliability.
     
     Process:
     1. Receives the AI's previous answer and full document content
@@ -195,7 +197,7 @@ async def get_highlights(request: HighlightsRequest):
         HighlightsResponse: Contains array of verbatim text snippets to highlight
         
     Raises:
-        HTTPException 500: If both Groq and Gemini fail
+        HTTPException 500: If both Groq and OpenAI fail
     """
     try:
         highlights = await get_relevance_highlights(

@@ -27,7 +27,6 @@ Create `backend/.env` with the following (or copy from `backend/.env.example`):
 |----------|---------|----------|
 | `GROQ_API_KEY` | Primary LLM for chat and highlights | Yes |
 | `OPENAI_API_KEY` | Embeddings and fallback LLM | Yes |
-| `GEMINI_API_KEY` | Fallback for highlights | Optional |
 
 ## Local development
 

@@ -1,0 +1,25 @@
+# RAG pipeline configuration (production)
+# Switch approaches via approach.use_query_rewriting / use_reranking
+
+# Vector store (ChromaDB) — path relative to backend directory
+vector_db:
+  path: "data/vector_db"
+  collection_name: "docs"
+
+# Embeddings (must match the model used when creating the vector DB)
+embedding_model: "text-embedding-3-large"
+
+# Retrieval parameters (from winning experiment: with_rewriting_and_reranking)
+retrieval:
+  retrieval_k: 20   # Chunks to retrieve per query (original + rewritten)
+  final_k: 10      # Chunks to pass to LLM after reranking
+
+# LLM for query rewriting, reranking, and answer generation
+model: "groq/openai/gpt-oss-20b"
+
+# Active RAG approach — switch between variants:
+# basic_rag: both false | with_reranking: rewriting=false, reranking=true
+# with_rewriting: rewriting=true, reranking=false | with_rewriting_and_reranking: both true
+approach:
+  use_query_rewriting: true
+  use_reranking: true

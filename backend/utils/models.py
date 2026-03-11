@@ -1,17 +1,18 @@
-"""Pydantic models for the RAG assistant experiments.
+"""Pydantic models for the RAG assistant (canonical source).
 
-This module defines the data structures used throughout the pipeline:
+Defines data structures used across the pipeline and API:
 
 - **Handbook documents**: Source content and metadata for the knowledge base
-- **Chunks**: Split document segments with LLM-generated headlines/summaries for retrieval
+- **Chunks**: Split document segments with LLM-generated headlines/summaries
 - **QA pairs**: Question-answer pairs for evaluation dataset generation
-- **Evaluation records**: Structures for assessing question quality and RAG answer quality
+- **Evaluation records**: Structures for assessing question/answer quality
+- **API models**: Request/response shapes for FastAPI endpoints
 """
 
-from typing import List, Literal
+from datetime import datetime
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
-
 
 # =============================================================================
 # Handbook Document Models
@@ -178,3 +179,53 @@ class AnswerEval(BaseModel):
     relevance: float = Field(
         description="How relevant is the answer to the specific question asked? 1 (very poor - off-topic) to 5 (ideal - directly addresses question and gives no additional information). Only answer 5 if the answer is completely relevant to the question and gives no additional information."
     )
+
+
+# =============================================================================
+# API Models (FastAPI Request/Response)
+# =============================================================================
+
+
+class SourceChunk(BaseModel):
+    """A citation referencing a specific snippet from a handbook document."""
+
+    docId: str
+    snippet: str
+
+
+class Message(BaseModel):
+    """A single message in the chat history."""
+
+    id: str
+    role: str  # 'user' or 'assistant'
+    content: str
+    sources: Optional[List[SourceChunk]] = None
+    highlights: Optional[Dict[str, List[str]]] = None
+    timestamp: Optional[datetime] = None
+
+
+class ChatRequest(BaseModel):
+    """Request payload for the chat endpoint."""
+
+    query: str
+    history: List[Message] = []
+
+
+class ChatResponse(BaseModel):
+    """Response from the chat endpoint."""
+
+    content: str
+    sources: List[SourceChunk]
+
+
+class HighlightsRequest(BaseModel):
+    """Request payload for the highlights endpoint."""
+
+    answer: str
+    document_content: str
+
+
+class HighlightsResponse(BaseModel):
+    """Response from the highlights endpoint."""
+
+    highlights: List[str]

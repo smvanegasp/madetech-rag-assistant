@@ -20,7 +20,7 @@ from typing import List
 
 import yaml
 
-from .models import HandbookDoc
+from utils.models import HandbookDoc
 
 
 def load_handbook_documents() -> List[HandbookDoc]:
