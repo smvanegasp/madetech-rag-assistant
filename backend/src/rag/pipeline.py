@@ -6,6 +6,7 @@ This module orchestrates the full RAG flow. All LLM calls go through litellm.
 
 from litellm import completion
 from openai import OpenAI
+from tenacity import retry, wait_exponential
 
 from utils.models import Result
 from utils.prompts import RAG_SYSTEM_PROMPT
@@ -91,6 +92,13 @@ def make_rag_messages(
     )
 
 
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+def _call_completion(model: str, messages: list[dict]) -> str:
+    """Call LLM completion with retry on transient failures."""
+    response = completion(model=model, messages=messages)
+    return response.choices[0].message.content
+
+
 def answer_question(
     question: str,
     history: list[dict] | None = None,
@@ -131,5 +139,4 @@ def answer_question(
     )
     messages = make_rag_messages(question, history, chunks)
     model = config.get("model", "groq/openai/gpt-oss-20b")
-    response = completion(model=model, messages=messages)
-    return response.choices[0].message.content, chunks
+    return _call_completion(model, messages), chunks

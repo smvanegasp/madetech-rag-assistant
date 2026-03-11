@@ -15,6 +15,7 @@ import os
 from typing import List
 
 from litellm import completion
+from tenacity import retry, wait_exponential
 
 
 async def get_relevance_highlights(answer: str, document_content: str) -> List[str]:
@@ -79,26 +80,22 @@ DOCUMENT:
 
     # Try Groq first (litellm routes via model prefix)
     try:
-        response = completion(
+        content = _completion_with_retry(
             model="groq/openai/gpt-oss-20b",
             messages=messages,
-            temperature=0,
-            response_format={"type": "json_object"},
         )
-        result = json.loads(response.choices[0].message.content)
+        result = json.loads(content)
         highlights = _parse_highlights_result(result)
         print("Highlights generated with Groq:", len(highlights), "phrases")
         return highlights
     except Exception as groq_error:
         print("Groq failed, falling back to OpenAI:", groq_error)
         try:
-            response = completion(
+            content = _completion_with_retry(
                 model="openai/gpt-4o-mini",
                 messages=messages,
-                temperature=0,
-                response_format={"type": "json_object"},
             )
-            result = json.loads(response.choices[0].message.content)
+            result = json.loads(content)
             highlights = _parse_highlights_result(result)
             print(
                 "Highlights generated with OpenAI (fallback):",
@@ -109,6 +106,18 @@ DOCUMENT:
         except Exception as openai_error:
             print("OpenAI fallback failed:", openai_error)
             return []
+
+
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+def _completion_with_retry(model: str, messages: list) -> str:
+    """Call LLM completion with retry on transient failures."""
+    response = completion(
+        model=model,
+        messages=messages,
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    return response.choices[0].message.content
 
 
 def _parse_highlights_result(result: dict | list | None) -> List[str]:

@@ -6,6 +6,7 @@ Uses OpenAI embeddings (not ChromaDB's built-in) to match the ingestion pipeline
 
 from chromadb import PersistentClient
 from openai import OpenAI
+from tenacity import retry, wait_exponential
 
 from utils.models import Result
 
@@ -20,6 +21,7 @@ def get_chroma_collection(db_path: str, collection_name: str):
     return chroma.get_collection(collection_name)
 
 
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
 def fetch_context_unranked(
     question: str,
     collection,
@@ -32,6 +34,7 @@ def fetch_context_unranked(
 
     Uses OpenAI embeddings (must match ingestion model). ChromaDB returns
     documents and metadatas, which we wrap as Result objects.
+    Retries on transient API failures with exponential backoff.
     """
     response = openai_client.embeddings.create(
         model=embedding_model,
