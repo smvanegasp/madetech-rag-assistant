@@ -6,7 +6,7 @@ Uses OpenAI embeddings (not ChromaDB's built-in) to match the ingestion pipeline
 
 from chromadb import PersistentClient
 from openai import OpenAI
-from tenacity import retry, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.models import Result
 
@@ -21,7 +21,7 @@ def get_chroma_collection(db_path: str, collection_name: str):
     return chroma.get_collection(collection_name)
 
 
-@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240), stop=stop_after_attempt(5))
 def fetch_context_unranked(
     question: str,
     collection,

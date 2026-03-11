@@ -5,17 +5,15 @@
  * This component manages all global state and coordinates interactions between:
  * - ChatArea: Message display and input
  * - Sidebar: Chat history and navigation
- * - SourceViewer: Document inspection with highlighting
+ * - SourceViewer: Document inspection
  * 
  * State management:
  * - Conversations: Array of Chat objects with message history
  * - Theme: Dark/light mode synchronized with DOM
  * - UI Panels: Sidebar and SourceViewer visibility
- * - Analysis Tasks: Tracks document highlighting operations
  * 
  * Key patterns:
  * - Uses refs to prevent stale closures in async operations
- * - Tracks per-document analysis tasks with Set<"messageId|docId">
  * - Manages unread notifications for background responses
  */
 
@@ -24,7 +22,7 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SourceViewer from './components/SourceViewer';
 import { Chat, Message, SourceChunk, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
-import { getHandbookResponse, getRelevanceHighlights, getHandbookDocs } from './services/apiService';
+import { getHandbookResponse, getHandbookDocs } from './services/apiService';
 import { PanelRight, Bell, BellRing } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -46,13 +44,6 @@ const App: React.FC = () => {
   /** All loaded handbook documents (fetched from backend on mount) */
   const [handbookDocs, setHandbookDocs] = useState<HandbookDoc[]>([]);
   
-  /** 
-   * Tracks specific document analysis tasks currently in progress.
-   * Each task is identified by "messageId|docId" format.
-   * This allows multiple documents to be analyzed simultaneously.
-   */
-  const [analyzingTasks, setAnalyzingTasks] = useState<Set<string>>(new Set());
-
   /**
    * Keeps track of the active chat ID in a ref to prevent stale closures.
    * This is crucial for async operations (like AI responses) that need to
@@ -123,94 +114,6 @@ const App: React.FC = () => {
   const unreadChats = chats.filter(c => c.hasUnreadResponse);
 
   /**
-   * Updates the highlights for a specific document in a specific message.
-   * 
-   * Highlights are stored per-document to allow incremental analysis. When a user
-   * requests highlights for a document, we store them in the message state so they
-   * persist even if the user switches to viewing a different document.
-   * 
-   * @param chatId - ID of the chat containing the message
-   * @param messageId - ID of the message to update
-   * @param docId - ID of the document that was analyzed
-   * @param highlights - Array of verbatim strings to highlight in the document
-   */
-  const updateMessageHighlights = useCallback((chatId: string, messageId: string, docId: string, highlights: string[]) => {
-    setChats(prev => prev.map(c => {
-      if (c.id !== chatId) return c;
-      return {
-        ...c,
-        messages: c.messages.map(m => {
-          if (m.id !== messageId) return m;
-          return {
-            ...m,
-            highlights: {
-              ...(m.highlights || {}),
-              [docId]: highlights
-            }
-          };
-        })
-      };
-    }));
-  }, []);
-
-  /**
-   * Triggers AI-powered semantic analysis for a specific document.
-   * 
-   * This function powers the "Highlight with AI" feature. When a user views a
-   * source document in the SourceViewer, they can click to highlight which specific
-   * phrases support the assistant's answer.
-   * 
-   * Process:
-   * 1. Mark the document analysis task as in-progress (shows loading spinner)
-   * 2. Call backend /api/highlights with answer and document content
-   * 3. Receive array of verbatim strings to highlight
-   * 4. Store highlights in message state (persists even if user switches documents)
-   * 5. Remove task from analyzing set (hides loading spinner)
-   * 
-   * The task key format "messageId|docId" ensures:
-   * - Multiple documents can be analyzed simultaneously
-   * - Each document is only analyzed once (prevents duplicate calls)
-   * - Analysis persists across document switches
-   * 
-   * @param messageId - ID of the assistant message whose answer we're verifying
-   * @param docId - ID of the document to analyze
-   * @param answer - The assistant's answer text (what we're looking for support for)
-   */
-  const handleTriggerDocAnalysis = useCallback(async (messageId: string, docId: string, answer: string) => {
-    const taskKey = `${messageId}|${docId}`;
-    if (analyzingTasks.has(taskKey) || !currentChatId) return;
-
-    // Mark specific document task as analyzing
-    setAnalyzingTasks(prev => new Set(prev).add(taskKey));
-
-    const activeChatId = currentChatId;
-    const doc = handbookDocs.find(d => d.id === docId);
-    
-    if (!doc) {
-      setAnalyzingTasks(prev => {
-        const next = new Set(prev);
-        next.delete(taskKey);
-        return next;
-      });
-      return;
-    }
-
-    try {
-      const highlights = await getRelevanceHighlights(answer, doc.content);
-      updateMessageHighlights(activeChatId, messageId, docId, highlights);
-    } catch (e) {
-      console.error(`Analysis failed for doc ${docId}:`, e);
-    } finally {
-      // Cleanup task state
-      setAnalyzingTasks(prev => {
-        const next = new Set(prev);
-        next.delete(taskKey);
-        return next;
-      });
-    }
-  }, [analyzingTasks, currentChatId, handbookDocs, updateMessageHighlights]);
-
-  /**
    * Handles sending a user message and receiving the AI response.
    * 
    * This is the core message flow that:
@@ -265,7 +168,6 @@ const App: React.FC = () => {
         content: response.content,
         sources: response.sources,
         timestamp: new Date(),
-        highlights: {}
       };
 
       setChats(prev => prev.map(chat => {
@@ -424,14 +326,6 @@ const App: React.FC = () => {
           onViewModeChange={handleViewModeChange}
           onDocChange={handleDocChange}
           theme={theme}
-          activeChat={currentChat}
-          isDocAnalyzing={analyzingTasks.has(`${selectedSource?.contextMessageId}|${selectedSource?.currentDocId}`)}
-          onTriggerAnalysis={() => {
-            const msg = currentChat?.messages.find(m => m.id === selectedSource?.contextMessageId);
-            if (msg && selectedSource) {
-              handleTriggerDocAnalysis(msg.id, selectedSource.currentDocId, msg.content);
-            }
-          }}
           handbookDocs={handbookDocs}
         />
       </main>

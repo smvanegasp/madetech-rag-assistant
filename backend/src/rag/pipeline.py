@@ -14,7 +14,7 @@ import json
 
 from litellm import completion
 from openai import OpenAI
-from tenacity import retry, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.models import Result
 from utils.prompts import RAG_SYSTEM_PROMPT, TOOL_DECISION_SYSTEM_PROMPT
@@ -131,14 +131,14 @@ def make_rag_messages(
     )
 
 
-@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240), stop=stop_after_attempt(5))
 def _call_completion(model: str, messages: list[dict]) -> str:
     """Call LLM completion with retry on transient failures."""
     response = completion(model=model, messages=messages)
     return response.choices[0].message.content
 
 
-@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240), stop=stop_after_attempt(5))
 def _call_completion_with_tools(model: str, messages: list[dict]):
     """
     Call LLM completion with the search_handbook tool available.

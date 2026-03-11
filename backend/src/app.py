@@ -7,11 +7,9 @@ API Endpoints:
 - GET  /api/health     — Health check and document count
 - GET  /api/handbook   — All handbook documents (for source viewer)
 - POST /api/chat       — RAG chat (query + history → answer + sources)
-- POST /api/highlights — AI-powered phrase highlighting in documents
 
 Request flow:
   /api/chat → RAGService.get_rag_response() → rag.pipeline.answer_question()
-  /api/highlights → highlights_service.get_relevance_highlights()
 
 Required environment variables:
 - GROQ_API_KEY, OPENAI_API_KEY
@@ -30,11 +28,8 @@ from utils.models import (
     ChatRequest,
     ChatResponse,
     HandbookDoc,
-    HighlightsRequest,
-    HighlightsResponse,
 )
 from .config_loader import load_config
-from .highlights_service import get_relevance_highlights
 from .handbook_loader import load_handbook_documents
 from .rag_service import RAGService
 
@@ -170,43 +165,6 @@ async def chat(request: ChatRequest):
         )
     except Exception as e:
         print(f"Chat endpoint error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/highlights", response_model=HighlightsResponse)
-async def get_highlights(request: HighlightsRequest):
-    """
-    Semantic analysis endpoint using Groq.
-    
-    This endpoint provides the "Highlight with AI" feature. When a user views
-    a source document, they can request AI-powered highlighting to see which
-    specific phrases support the chatbot's previous answer.
-    
-    Uses Groq for fast inference with OpenAI as fallback for reliability.
-    
-    Process:
-    1. Receives the AI's previous answer and full document content
-    2. Asks Groq to find 5-8 exact phrases in the document
-    3. Returns array of verbatim strings that support the claims
-    4. Frontend injects <mark> tags around these phrases
-    
-    Args:
-        request (HighlightsRequest): Contains answer and document_content
-        
-    Returns:
-        HighlightsResponse: Contains array of verbatim text snippets to highlight
-        
-    Raises:
-        HTTPException 500: If both Groq and OpenAI fail
-    """
-    try:
-        highlights = await get_relevance_highlights(
-            answer=request.answer,
-            document_content=request.document_content
-        )
-        return HighlightsResponse(highlights=highlights)
-    except Exception as e:
-        print(f"Highlights endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

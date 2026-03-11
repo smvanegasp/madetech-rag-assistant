@@ -17,7 +17,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react';
+import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Message, SourceChunk, Theme, HandbookDoc } from '../types';
 
@@ -116,16 +116,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       }
     });
 
+    const cappedDocs = distinctDocs.slice(0, 4);
     const isExpanded = expandedCitations[message.id];
-    const visibleDocIds = isExpanded ? distinctDocs : [distinctDocs[0]];
-    const hasMore = distinctDocs.length > 1;
+    const visibleDocIds = isExpanded ? cappedDocs : [cappedDocs[0]];
+    const hasMore = cappedDocs.length > 1;
 
     return (
       <div className="flex flex-col mt-6 animate-in fade-in duration-700">
         <div className="flex flex-wrap gap-2 items-center">
           {visibleDocIds.map((docId, idx) => {
             const doc = handbookDocs.find(d => d.id === docId);
-            const isAnalyzed = !!message.highlights?.[docId];
             return doc ? (
               <button
                 key={`${message.id}-${idx}`}
@@ -135,9 +135,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-emerald-500/50 hover:text-zinc-200' 
                     : 'bg-white border-zinc-200 text-zinc-600 hover:border-emerald-500 hover:text-emerald-600'}`}
               >
-                <FileText size={12} className={isAnalyzed ? "text-emerald-500" : "text-zinc-400"} />
+                <FileText size={12} className="text-zinc-400" />
                 <span className="truncate max-w-[150px] font-medium">{doc.title}</span>
-                {isAnalyzed && <Sparkles size={10} className="text-emerald-500/50" />}
               </button>
             ) : null;
           })}
@@ -153,7 +152,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               {isExpanded ? (
                 <>Show less <ChevronUp size={12} /></>
               ) : (
-                <>+{distinctDocs.length - 1} more sources <ChevronDown size={12} /></>
+                <>+{cappedDocs.length - 1} more sources <ChevronDown size={12} /></>
               )}
             </button>
           )}
@@ -190,10 +189,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
-                  "What is the vacation policy?",
-                  "How do I claim home office stipend?",
-                  "Tell me about sick leave rules.",
-                  "What are the IT security protocols?"
+                  "Which cities does Made Tech have offices in?",
+                  "How do I get confidential advice if I'm struggling?",
+                  "Do all employees sign confidentiality agreements?",
+                  "How often are laptops replaced for non-engineer roles?"
                 ].map((q) => (
                   <button
                     key={q}

@@ -5,10 +5,10 @@ E.g. "What about parental leave?" + history → "parental leave policy Made Tech
 """
 
 from litellm import completion
-from tenacity import retry, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
-@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240), stop=stop_after_attempt(5))
 def rewrite_query(
     question: str,
     history: list[dict],

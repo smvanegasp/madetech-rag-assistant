@@ -10,7 +10,7 @@ Defines data structures used across the pipeline and API:
 """
 
 from datetime import datetime
-from typing import Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -200,7 +200,6 @@ class Message(BaseModel):
     role: str  # 'user' or 'assistant'
     content: str
     sources: Optional[List[SourceChunk]] = None
-    highlights: Optional[Dict[str, List[str]]] = None
     timestamp: Optional[datetime] = None
 
 
@@ -218,14 +217,3 @@ class ChatResponse(BaseModel):
     sources: List[SourceChunk]
 
 
-class HighlightsRequest(BaseModel):
-    """Request payload for the highlights endpoint."""
-
-    answer: str
-    document_content: str
-
-
-class HighlightsResponse(BaseModel):
-    """Response from the highlights endpoint."""
-
-    highlights: List[str]

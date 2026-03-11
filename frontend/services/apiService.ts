@@ -65,33 +65,3 @@ export async function getHandbookResponse(query: string, history: Message[]) {
     };
   }
 }
-
-/**
- * Triggers a secondary semantic analysis pass.
- * Finds specific phrases in the source document that support a previously generated answer.
- * Used for the "Highlight with AI" feature in the SourceViewer.
- */
-export async function getRelevanceHighlights(answer: string, documentContent: string): Promise<string[]> {
-  try {
-    const response = await fetch(`${API_URL}/api/highlights`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        answer,
-        document_content: documentContent
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.highlights;
-  } catch (error) {
-    console.error("Semantic Analysis Error:", error);
-    return [];
-  }
-}

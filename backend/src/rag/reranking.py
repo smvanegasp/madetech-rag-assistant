@@ -6,7 +6,7 @@ ChromaDB returns cosine-similar chunks; this step lets an LLM refine the order.
 
 from litellm import completion
 from pydantic import BaseModel, Field
-from tenacity import retry, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.models import Result
 
@@ -58,7 +58,7 @@ def _repair_concatenated_order(concatenated: int, n: int) -> list[int] | None:
     return result if len(result) == n and i == len(s) else None
 
 
-@retry(wait=wait_exponential(multiplier=1, min=10, max=240))
+@retry(wait=wait_exponential(multiplier=1, min=10, max=240), stop=stop_after_attempt(5))
 def rerank(question: str, chunks: list[Result], model: str) -> list[Result]:
     """
     Ask an LLM to reorder chunks by relevance to the question.
