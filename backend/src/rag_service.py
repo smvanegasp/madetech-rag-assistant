@@ -76,7 +76,9 @@ class RAGService:
             if config.get("use_query_rewriting")
             else "basic_rag"
         )
-        print(f"RAG service initialized ({approach_desc}) with Chroma Cloud collection '{self.collection_name}'")
+        print(
+            f"RAG service initialized ({approach_desc}) with Chroma Cloud collection '{self.collection_name}'"
+        )
 
     def _extract_sources(
         self, chunks: List[Any], max_sources: int = 10
