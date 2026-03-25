@@ -21,6 +21,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SourceViewer from './components/SourceViewer';
+import WelcomeModal from './components/WelcomeModal';
 import { Chat, Message, SourceChunk, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
 import { getHandbookResponse, getHandbookDocs } from './services/apiService';
 import { PanelRight, Bell, BellRing } from 'lucide-react';
@@ -32,6 +33,14 @@ const App: React.FC = () => {
   const [sourceViewerOpen, setSourceViewerOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<SelectedSource | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showWelcome, setShowWelcome] = useState<boolean>(
+    () => !localStorage.getItem('welcomeSeen')
+  );
+
+  const handleCloseWelcome = useCallback(() => {
+    localStorage.setItem('welcomeSeen', '1');
+    setShowWelcome(false);
+  }, []);
 
   // --- DATA STATE ---
   // --- CONVERSATION STATE ---
@@ -309,6 +318,7 @@ const App: React.FC = () => {
             onOpenSource={handleOpenSource}
             theme={theme}
             handbookDocs={handbookDocs}
+            onOpenDisclaimer={() => setShowWelcome(true)}
           />
         </div>
 
@@ -336,6 +346,12 @@ const App: React.FC = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      <WelcomeModal
+        isOpen={showWelcome}
+        onClose={handleCloseWelcome}
+        theme={theme}
+      />
     </div>
   );
 };
