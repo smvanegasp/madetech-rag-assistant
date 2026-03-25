@@ -1,14 +1,18 @@
 """ChromaDB retrieval and semantic search for the RAG pipeline."""
 
-from chromadb import PersistentClient
+import chromadb
 from openai import OpenAI
 
 from utils.models import Result
 
 
-def get_chroma_collection(db_path: str, collection_name: str):
-    """Connect to ChromaDB and return the specified collection."""
-    chroma = PersistentClient(path=db_path)
+def get_chroma_collection(collection_name: str, api_key: str, tenant: str, database: str):
+    """Connect to ChromaDB Cloud and return the specified collection."""
+    chroma = chromadb.CloudClient(
+        api_key=api_key,
+        tenant=tenant,
+        database=database,
+    )
     return chroma.get_collection(collection_name)
 
 

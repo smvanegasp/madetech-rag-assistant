@@ -1,9 +1,9 @@
 # RAG pipeline configuration (production)
 # Switch approaches via approach.use_query_rewriting / use_reranking
 
-# Vector store (ChromaDB) — path relative to backend directory
+# Vector store (ChromaDB Cloud)
 vector_db:
-  path: "data/vector_db"
+  database: "madetech_handbook"
   collection_name: "docs"
 
 # Embeddings (must match the model used when creating the vector DB)

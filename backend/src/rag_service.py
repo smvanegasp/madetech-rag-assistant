@@ -48,22 +48,23 @@ class RAGService:
     def __init__(self, config: dict | None = None):
         config = config if config is not None else load_config()
         self.config = config
-        self.vector_db_path = config["vector_db"]["path"]
         self.collection_name = config["vector_db"]["collection_name"]
+        self.chroma_database = config["vector_db"]["database"]
 
         openai_api_key = os.getenv("OPENAI_API_KEY")
         if not openai_api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
         self.openai_client = OpenAI(api_key=openai_api_key)
 
-        if not os.path.exists(self.vector_db_path):
-            raise FileNotFoundError(
-                f"Vector database not found at {self.vector_db_path}. "
-                "Please run the ingest script first: python -m scripts.ingest"
-            )
+        chroma_api_key = os.getenv("CHROMA_API_KEY")
+        if not chroma_api_key:
+            raise ValueError("CHROMA_API_KEY environment variable not set")
+        chroma_tenant = os.getenv("TENANT_CHROMA")
+        if not chroma_tenant:
+            raise ValueError("TENANT_CHROMA environment variable not set")
 
         self.collection = get_chroma_collection(
-            self.vector_db_path, self.collection_name
+            self.collection_name, chroma_api_key, chroma_tenant, self.chroma_database
         )
 
         approach_desc = (
@@ -75,7 +76,7 @@ class RAGService:
             if config.get("use_query_rewriting")
             else "basic_rag"
         )
-        print(f"RAG service initialized ({approach_desc}) at {self.vector_db_path}")
+        print(f"RAG service initialized ({approach_desc}) with Chroma Cloud collection '{self.collection_name}'")
 
     def _extract_sources(
         self, chunks: List[Any], max_sources: int = 10

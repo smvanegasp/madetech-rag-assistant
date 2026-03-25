@@ -13,6 +13,7 @@ Run from repo root:
 """
 
 import json
+import os
 import random
 import sys
 from datetime import datetime
@@ -83,8 +84,8 @@ _worker_collection = None
 _worker_client = None
 
 
-def _init_eval_worker(db_path_str: str, collection_name: str, env_path: str) -> None:
-    """Initialize worker process with ChromaDB collection and OpenAI client."""
+def _init_eval_worker(collection_name: str, database: str, env_path: str) -> None:
+    """Initialize worker process with ChromaDB Cloud collection and OpenAI client."""
     global _worker_collection, _worker_client
     from openai import OpenAI
 
@@ -92,7 +93,9 @@ def _init_eval_worker(db_path_str: str, collection_name: str, env_path: str) -> 
         load_dotenv(env_path, override=True)
     from retrieval import get_chroma_collection
 
-    _worker_collection = get_chroma_collection(db_path_str, collection_name)
+    api_key = os.getenv("CHROMA_API_KEY")
+    tenant = os.getenv("TENANT_CHROMA")
+    _worker_collection = get_chroma_collection(collection_name, api_key, tenant, database)
     _worker_client = OpenAI()
 
 
@@ -181,20 +184,21 @@ def main() -> None:
             save_plots(load_path, all_results, df_summary)
         return
 
-    # Resolve ChromaDB
+    # Connect to ChromaDB Cloud
     vector_db = config.get("vector_db", {})
-    db_path_str = vector_db.get("path", "../../../backend/data/vector_db")
-    db_path = (SCRIPT_DIR / db_path_str).resolve()
     collection_name = vector_db.get("collection_name", "docs")
+    chroma_database = vector_db.get("database")
 
-    if not db_path.exists():
-        print(f"[ERROR] ChromaDB path does not exist: {db_path}")
-        print("Run 01_llm_chunking_embedding first.")
-        sys.exit(1)
+    chroma_api_key = os.getenv("CHROMA_API_KEY")
+    if not chroma_api_key:
+        raise ValueError("CHROMA_API_KEY environment variable not set")
+    chroma_tenant = os.getenv("TENANT_CHROMA")
+    if not chroma_tenant:
+        raise ValueError("TENANT_CHROMA environment variable not set")
 
-    collection = get_chroma_collection(str(db_path), collection_name)
+    collection = get_chroma_collection(collection_name, chroma_api_key, chroma_tenant, chroma_database)
     print(
-        f"[OK] ChromaDB collection '{collection_name}' has {collection.count()} chunks"
+        f"[OK] ChromaDB Cloud collection '{collection_name}' has {collection.count()} chunks"
     )
 
     # Load questions
@@ -236,7 +240,7 @@ def main() -> None:
         with Pool(
             processes=workers,
             initializer=_init_eval_worker,
-            initargs=(str(db_path), collection_name, str(BACKEND_PATH / ".env")),
+            initargs=(collection_name, chroma_database, str(BACKEND_PATH / ".env")),
         ) as pool:
             for result in tqdm(
                 pool.imap_unordered(process_qa, questions),

@@ -12,6 +12,7 @@ Run from repo root:
     python -m experiments.scripts.02_advanced_rag.main "What cycling benefits do I have?"
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -44,24 +45,20 @@ else:
 
 
 def main() -> None:
-    """Run the RAG pipeline: load config, connect to ChromaDB, answer question(s)."""
+    """Run the RAG pipeline: load config, connect to ChromaDB Cloud, answer question(s)."""
     config = load_config(script_dir=SCRIPT_DIR)
     vector_db = config.get("vector_db") or {}
-    db_path_str = vector_db.get(
-        "path", "../01_llm_chunking_embedding/output/preprocessed_db"
-    )
     collection_name = vector_db.get("collection_name", "docs")
+    chroma_database = vector_db.get("database")
 
-    # Resolve db path relative to this script's directory
-    db_path = (SCRIPT_DIR / db_path_str).resolve()
-    if not db_path.exists():
-        print(f"[ERROR] ChromaDB path does not exist: {db_path}")
-        print(
-            "Run 01_llm_chunking_embedding first to create the preprocessed database."
-        )
-        sys.exit(1)
+    chroma_api_key = os.getenv("CHROMA_API_KEY")
+    if not chroma_api_key:
+        raise ValueError("CHROMA_API_KEY environment variable not set")
+    chroma_tenant = os.getenv("TENANT_CHROMA")
+    if not chroma_tenant:
+        raise ValueError("TENANT_CHROMA environment variable not set")
 
-    collection = get_chroma_collection(str(db_path), collection_name)
+    collection = get_chroma_collection(collection_name, chroma_api_key, chroma_tenant, chroma_database)
     print(f"Collection '{collection_name}' has {collection.count()} chunks", flush=True)
     print(
         "\nType a question and press Enter. Type 'quit' or 'exit' to stop.\n",
