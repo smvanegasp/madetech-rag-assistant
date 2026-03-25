@@ -16,6 +16,7 @@ Run from repo root:
     python -m backend.scripts.01_llm_chunking_embedding.main
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -63,6 +64,13 @@ def main() -> None:
     vector_db = config.get("vector_db")
     embedding_model = config.get("embedding_model")
 
+    chroma_api_key = os.getenv("CHROMA_API_KEY")
+    if not chroma_api_key:
+        raise ValueError("CHROMA_API_KEY environment variable not set")
+    chroma_tenant = os.getenv("TENANT_CHROMA")
+    if not chroma_tenant:
+        raise ValueError("TENANT_CHROMA environment variable not set")
+
     documents = load_handbook_documents(handbook_path)
     if document_limit is not None:
         documents = documents[:document_limit]
@@ -77,12 +85,13 @@ def main() -> None:
     )
     print(f"Generated {len(chunks)} chunks")
 
-    db_path = SCRIPT_DIR / vector_db.get("path", "preprocessed_db")
     create_embeddings(
         chunks,
-        db_path=str(db_path),
         collection_name=vector_db.get("collection_name", "docs"),
         embedding_model=embedding_model,
+        chroma_api_key=chroma_api_key,
+        chroma_tenant=chroma_tenant,
+        chroma_database=vector_db.get("database"),
     )
 
 

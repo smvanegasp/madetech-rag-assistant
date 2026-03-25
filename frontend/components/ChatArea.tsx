@@ -41,6 +41,8 @@ interface ChatAreaProps {
   theme: Theme;
   /** All loaded handbook documents (for citation lookups) */
   handbookDocs: HandbookDoc[];
+  /** Callback to re-open the welcome/disclaimer modal */
+  onOpenDisclaimer: () => void;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -51,11 +53,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading,
   onOpenSource,
   theme,
-  handbookDocs
+  handbookDocs,
+  onOpenDisclaimer
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDark = theme === 'dark';
   const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
+
+  const MAX_TEXTAREA_HEIGHT = 128;
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px';
+  }, [inputValue]);
 
   /**
    * Effect: Automatically scrolls the chat window to the bottom whenever
@@ -75,7 +88,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (!isLoading) onSend();
     }
   };
 
@@ -247,32 +260,42 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Input Area */}
       <div className={`p-4 sm:p-6 border-t ${isDark ? 'border-zinc-800 bg-zinc-950/50' : 'border-zinc-100 bg-white/50'} backdrop-blur-md`}>
-        <div className="max-w-3xl mx-auto relative group">
+        <div className={`max-w-3xl mx-auto flex flex-col rounded-2xl border overflow-hidden transition-all
+          ${isDark 
+            ? 'border-zinc-800 bg-zinc-950 focus-within:border-zinc-700' 
+            : 'border-zinc-200 bg-white shadow-sm focus-within:border-emerald-500 focus-within:shadow-emerald-500/10'}`}>
           <textarea
+            ref={textareaRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search handbook documents..."
             rows={1}
-            className={`w-full bg-transparent border rounded-2xl pl-4 pr-12 py-3.5 text-sm outline-none transition-all resize-none overflow-hidden
-              ${isDark 
-                ? 'border-zinc-800 focus:border-zinc-700 text-zinc-200' 
-                : 'border-zinc-200 focus:border-emerald-500 text-zinc-900 shadow-sm focus:shadow-emerald-500/10'}`}
-            style={{ height: '54px' }}
+            className={`w-full bg-transparent pl-4 pr-4 pt-3.5 pb-1 text-sm outline-none resize-none overflow-y-auto
+              ${isDark ? 'text-zinc-200 placeholder:text-zinc-600' : 'text-zinc-900 placeholder:text-zinc-400'}`}
+            style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT}px` }}
           />
-          <button
-            onClick={onSend}
-            disabled={!inputValue.trim() || isLoading}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all
-              ${!inputValue.trim() || isLoading
-                ? 'opacity-30 cursor-not-allowed'
-                : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 active:scale-95'}`}
-          >
-            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-          </button>
+          <div className="flex justify-end px-2 pb-2">
+            <button
+              onClick={onSend}
+              disabled={!inputValue.trim() || isLoading}
+              className={`p-2 rounded-xl transition-all
+                ${!inputValue.trim() || isLoading
+                  ? 'opacity-30 cursor-not-allowed'
+                  : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 active:scale-95'}`}
+            >
+              {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            </button>
+          </div>
         </div>
         <p className={`mt-2 text-center text-[10px] ${isDark ? 'text-zinc-600' : 'text-zinc-400'}`}>
-          AI results may be subject to human error. Please verify critical policy details in original documents.
+          AI results may be subject to human error. Please verify critical policy details in original documents.{' '}
+          <button
+            onClick={onOpenDisclaimer}
+            className={`underline underline-offset-2 transition-colors ${isDark ? 'text-emerald-500 hover:text-emerald-400' : 'text-emerald-600 hover:text-emerald-500'}`}
+          >
+            Disclaimer
+          </button>
         </p>
       </div>
     </div>

@@ -12,9 +12,9 @@ chunking_workers: 3  # Set to 1 to avoid rate limits; increase for faster runs
 chunking_model: "groq/openai/gpt-oss-20b"
 max_tokens: 65536
 
-# Vector store (ChromaDB)
+# Vector store (ChromaDB Cloud)
 vector_db:
-  path: "../../data/vector_db"
+  database: "madetech_handbook"
   collection_name: "docs"
 
 # Embeddings

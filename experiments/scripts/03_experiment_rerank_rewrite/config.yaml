@@ -13,9 +13,9 @@ questions:
   n_questions: null       # null = use all questions; int = random sample
   random_seed: 42         # For reproducible sampling when n_questions is set
 
-# Vector store (ChromaDB) — path relative to this script's directory
+# Vector store (ChromaDB Cloud)
 vector_db:
-  path: "../../../backend/data/vector_db"
+  database: "madetech_handbook"
   collection_name: "docs"
 
 # Embeddings (must match the model used in 01_llm_chunking_embedding)

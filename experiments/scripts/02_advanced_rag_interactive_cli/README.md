@@ -1,6 +1,6 @@
 # Advanced RAG Pipeline
 
-Runs retrieval-augmented generation using the ChromaDB created by `01_llm_chunking_embedding`. Implements query rewriting, dual retrieval (original + rewritten query), LLM-based reranking, and answer generation.
+Interactive CLI for retrieval-augmented generation using the Chroma Cloud collection created by `01_llm_chunking_embedding`. Implements query rewriting, dual retrieval (original + rewritten query), LLM-based reranking, and answer generation.
 
 ## Overview
 
@@ -15,20 +15,23 @@ This pipeline answers questions about the Made Tech handbook using an advanced R
 
 - Python 3.10+
 - Dependencies from `experiments/requirements.txt` (litellm, chromadb, openai, pyyaml, python-dotenv, pydantic)
-- API keys in `backend/.env` (OpenAI for embeddings; LiteLLM/Groq for LLM calls)
-- Run `01_llm_chunking_embedding` first to create the ChromaDB
+- `backend/.env` with the following keys set:
+  - `OPENAI_API_KEY` — for embeddings
+  - `GROQ_API_KEY` — for LLM calls (rewriting, reranking, answering)
+  - `CHROMA_API_KEY` — Chroma Cloud API key
+  - `TENANT_CHROMA` — Chroma Cloud tenant ID
+- Run `01_llm_chunking_embedding` first to populate the Chroma Cloud collection
 
 ## Usage
 
-Run from the repo root:
+From the **repo root**, activate the experiments virtual environment and run:
 
-```bash
-# Default question: "What cycling benefits do I have?"
-python -m experiments.scripts.02_advanced_rag.main
-
-# Custom question
-python -m experiments.scripts.02_advanced_rag.main "How many days of annual leave do I get?"
+```powershell
+.\experiments\.venv\Scripts\Activate.ps1
+python -m experiments.scripts.02_advanced_rag_interactive_cli.main
 ```
+
+The script starts an interactive loop — type your question and press Enter. Type `quit` or `exit` to stop.
 
 ## Configuration
 
@@ -36,9 +39,9 @@ Edit `config.yaml` in this directory:
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `vector_db.path` | ChromaDB path (relative to this script) | `../01_llm_chunking_embedding/output/preprocessed_db` |
-| `vector_db.collection_name` | ChromaDB collection | `docs` |
-| `embedding_model` | OpenAI embedding model (must match 01) | `text-embedding-3-large` |
+| `vector_db.database` | Chroma Cloud database name | `madetech_handbook` |
+| `vector_db.collection_name` | Chroma Cloud collection | `docs` |
+| `embedding_model` | OpenAI embedding model (must match `01_llm_chunking_embedding`) | `text-embedding-3-large` |
 | `retrieval.retrieval_k` | Chunks per query (original + rewritten) | `10` |
 | `retrieval.final_k` | Chunks passed to LLM after reranking | `7` |
 | `model` | LLM for rewriting, reranking, and answering | `groq/openai/gpt-oss-20b` |
@@ -48,7 +51,7 @@ Edit `config.yaml` in this directory:
 | Module | Purpose |
 |--------|---------|
 | `config.py` | Loads YAML configuration |
-| `retrieval.py` | ChromaDB connection and semantic search |
+| `retrieval.py` | Chroma Cloud connection and semantic search |
 | `query_rewriting.py` | LLM-based query expansion |
 | `reranking.py` | LLM-based chunk reranking |
 | `rag.py` | Pipeline orchestration (fetch_context, answer_question) |

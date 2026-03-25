@@ -17,6 +17,9 @@
 # Run command:
 #   docker run -p 9481:9481 --env-file .env.local rag-handbook
 #
+# Required env vars (in .env.local):
+#   OPENAI_API_KEY, GROQ_API_KEY, CHROMA_API_KEY, TENANT_CHROMA
+#
 # =======================================================================================
 
 
@@ -87,14 +90,12 @@ WORKDIR /app
 # This includes:
 # - src/ (Python application code)
 # - data/handbook/ (markdown documents)
-# - data/vector_db/ (pre-created ChromaDB database)
 # - pyproject.toml (dependency specification)
+# Note: vector_db is NOT copied — the vector store lives in Chroma Cloud
 COPY backend/ ./backend/
 
 # Verify critical data directories exist before proceeding
-# The application cannot function without these directories
 RUN test -d backend/data/handbook || (echo "ERROR: handbook directory not found" && exit 1)
-RUN test -d backend/data/vector_db || (echo "ERROR: vector_db directory not found" && exit 1)
 
 # Install Python dependencies using uv
 # --no-cache-dir: Don't store cache (reduces image size)
@@ -118,10 +119,6 @@ FROM python:3.12-slim
 # Running as root in containers is a security risk
 RUN useradd -m appuser
 
-# Create temporary data directory for ChromaDB operations
-# Some ChromaDB operations require a writable temp directory
-RUN mkdir -p /app/tmp_data && chown appuser:appuser /app/tmp_data
-
 WORKDIR /app
 
 # Copy Python packages from builder stage
@@ -130,26 +127,17 @@ COPY --from=backend-builder /usr/local /usr/local
 
 # Copy application code, data, and built frontend from builder stage
 # /app/backend/src/ - Python application
-# /app/backend/data/ - Handbook markdown and vector database
+# /app/backend/data/ - Handbook markdown documents
 # /app/frontend/dist/ - Built React app
 COPY --from=backend-builder /app /app
 
-# Verification: Ensure all required data is present in final image
-# This catches issues early if data directories were accidentally excluded
+# Verification: Ensure handbook data is present in final image
 # Also displays a count of handbook files for debugging
-RUN python -c "import os; \
+RUN python -c "import os, glob; \
     handbook_path = '/app/backend/data/handbook'; \
-    vector_db_path = '/app/backend/data/vector_db'; \
     assert os.path.exists(handbook_path), f'Handbook not found at {handbook_path}'; \
-    assert os.path.exists(vector_db_path), f'Vector DB not found at {vector_db_path}'; \
-    import glob; \
     md_count = len(glob.glob(handbook_path + '/**/*.md', recursive=True)); \
-    print(f'✓ Data directories verified: {md_count} handbook files found')"
-
-# ChromaDB requires write access to its database directory
-# SQLite WAL mode writes to the database even for read queries
-# Also grant write access to tmp_data for temporary operations
-RUN chown -R appuser:appuser /app/backend/data/vector_db /app/tmp_data
+    print(f'✓ Handbook verified: {md_count} files found')"
 
 # Environment variable: Tell FastAPI where to find built frontend
 # The backend serves these files for production (no separate frontend server)

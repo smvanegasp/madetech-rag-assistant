@@ -15,13 +15,12 @@ import json
 from litellm import completion
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
-
 from utils.models import Result
 from utils.prompts import RAG_SYSTEM_PROMPT, TOOL_DECISION_SYSTEM_PROMPT
+
 from .query_rewriting import rewrite_query
 from .reranking import merge_chunks, rerank
 from .retrieval import fetch_context_unranked
-
 
 SEARCH_HANDBOOK_TOOL = {
     "type": "function",

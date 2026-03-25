@@ -14,14 +14,76 @@ interface MarkdownRendererProps {
   content: string;
   theme: Theme;
   className?: string;
+  searchQuery?: string;
+}
+
+/**
+ * Recursively walks React children and wraps text nodes that match the search
+ * query in <mark> elements. Non-matching text and non-string nodes are
+ * returned unchanged.
+ */
+function highlightText(
+  children: React.ReactNode,
+  query: string,
+  isDark: boolean,
+  keyPrefix = 'hl'
+): React.ReactNode {
+  if (!query) return children;
+
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const markClass = isDark
+    ? 'bg-emerald-500/25 text-emerald-200 rounded-sm px-0.5'
+    : 'bg-emerald-100 text-emerald-900 rounded-sm px-0.5';
+
+  const processNode = (node: React.ReactNode, idx: number | string): React.ReactNode => {
+    if (typeof node === 'string') {
+      const parts = node.split(regex);
+      if (parts.length === 1) return node;
+      return parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark
+            key={`${keyPrefix}-${idx}-${i}`}
+            data-search-match="true"
+            className={markClass}
+          >
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      );
+    }
+    if (React.isValidElement(node)) {
+      const el = node as React.ReactElement<{ children?: React.ReactNode }>;
+      if (el.props.children) {
+        return React.cloneElement(el, {
+          children: highlightText(el.props.children, query, isDark, `${keyPrefix}-${idx}`),
+        } as any);
+      }
+    }
+    if (Array.isArray(node)) {
+      return node.map((child, i) => processNode(child, `${keyPrefix}-arr-${i}`));
+    }
+    return node;
+  };
+
+  if (Array.isArray(children)) {
+    return children.map((child, i) => processNode(child, i));
+  }
+  return processNode(children, 0);
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
   content, 
   theme, 
-  className = "" 
+  className = "",
+  searchQuery = ""
 }) => {
   const isDark = theme === 'dark';
+  const trimmedQuery = searchQuery.trim();
+
+  const hl = (children: React.ReactNode) =>
+    trimmedQuery ? highlightText(children, trimmedQuery, isDark) : children;
 
   /**
    * Custom Markdown component mapping to ensure theme-aware colors 
@@ -32,14 +94,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     const borderColor = isDark ? 'border-zinc-800' : 'border-zinc-200';
     
     return {
-      h1: ({ children }: any) => <h1 className={`text-xl font-bold mt-6 mb-4 ${textColor}`}>{children}</h1>,
-      h2: ({ children }: any) => <h2 className={`text-lg font-bold mt-5 mb-3 ${textColor}`}>{children}</h2>,
-      h3: ({ children }: any) => <h3 className={`text-base font-bold mt-4 mb-2 ${textColor}`}>{children}</h3>,
-      h4: ({ children }: any) => <h4 className={`text-sm font-bold mt-3 mb-1 ${textColor}`}>{children}</h4>,
-      strong: ({ children }: any) => <strong className={`font-bold ${textColor}`}>{children}</strong>,
-      p: ({ children }: any) => <p className="mb-4 leading-relaxed">{children}</p>,
-      li: ({ children }: any) => <li className="mb-1">{children}</li>,
-      em: ({ children }: any) => <em className="italic">{children}</em>,
+      h1: ({ children }: any) => <h1 className={`text-xl font-bold mt-6 mb-4 ${textColor}`}>{hl(children)}</h1>,
+      h2: ({ children }: any) => <h2 className={`text-lg font-bold mt-5 mb-3 ${textColor}`}>{hl(children)}</h2>,
+      h3: ({ children }: any) => <h3 className={`text-base font-bold mt-4 mb-2 ${textColor}`}>{hl(children)}</h3>,
+      h4: ({ children }: any) => <h4 className={`text-sm font-bold mt-3 mb-1 ${textColor}`}>{hl(children)}</h4>,
+      strong: ({ children }: any) => <strong className={`font-bold ${textColor}`}>{hl(children)}</strong>,
+      p: ({ children }: any) => <p className="mb-4 leading-relaxed">{hl(children)}</p>,
+      li: ({ children }: any) => <li className="mb-1">{hl(children)}</li>,
+      em: ({ children }: any) => <em className="italic">{hl(children)}</em>,
       table: ({ children }: any) => (
         <div className="overflow-x-auto my-6 rounded-xl border border-inherit shadow-sm">
           <table className={`min-w-full border-collapse ${borderColor}`}>
@@ -54,12 +116,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       ),
       th: ({ children }: any) => (
         <th className={`border px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider ${borderColor} ${isDark ? 'text-zinc-200' : 'text-zinc-600'}`}>
-          {children}
+          {hl(children)}
         </th>
       ),
       td: ({ children }: any) => (
         <td className={`border px-4 py-3 text-sm leading-relaxed ${borderColor} ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-          {children}
+          {hl(children)}
         </td>
       ),
       tr: ({ children }: any) => (
@@ -69,7 +131,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       ),
       blockquote: ({ children }: any) => (
         <blockquote className={`border-l-4 pl-4 italic my-4 py-1 ${isDark ? 'border-zinc-700 text-zinc-400' : 'border-zinc-300 text-zinc-600'}`}>
-          {children}
+          {hl(children)}
         </blockquote>
       ),
       a: ({ href, children }: any) => (
@@ -79,11 +141,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           rel="noopener noreferrer"
           className={`font-medium underline underline-offset-2 transition-colors ${isDark ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-700'}`}
         >
-          {children}
+          {hl(children)}
         </a>
       )
     };
-  }, [isDark]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDark, trimmedQuery]);
 
   return (
     <div className={`prose prose-sm dark:prose-invert max-w-none prose-zinc ${isDark ? 'text-zinc-300' : 'text-zinc-800'} ${className}`}>

@@ -4,20 +4,27 @@ ChromaDB retrieval — embed query and fetch similar chunks.
 Uses OpenAI embeddings (not ChromaDB's built-in) to match the ingestion pipeline.
 """
 
-from chromadb import PersistentClient
+import chromadb
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.models import Result
 
 
-def get_chroma_collection(db_path: str, collection_name: str):
+def get_chroma_collection(collection_name: str, api_key: str, tenant: str, database: str):
     """
-    Connect to ChromaDB and return the named collection.
+    Connect to ChromaDB Cloud and return the named collection.
 
-    db_path: Path to the ChromaDB data directory (e.g. backend/data/vector_db).
+    collection_name: Name of the Chroma collection within the database.
+    api_key: Chroma Cloud API key.
+    tenant: Chroma Cloud tenant identifier.
+    database: Chroma Cloud database name (e.g. madetech_handbook).
     """
-    chroma = PersistentClient(path=db_path)
+    chroma = chromadb.CloudClient(
+        api_key=api_key,
+        tenant=tenant,
+        database=database,
+    )
     return chroma.get_collection(collection_name)
 
 

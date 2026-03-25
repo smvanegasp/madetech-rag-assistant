@@ -1,9 +1,9 @@
 # Advanced RAG pipeline configuration
-# Uses ChromaDB from 01_llm_chunking_embedding for retrieval
+# Uses ChromaDB Cloud for retrieval
 
-# Vector store (ChromaDB) — path relative to 01_llm_chunking_embedding script dir
+# Vector store (ChromaDB Cloud)
 vector_db:
-  path: "../../../backend/data/vector_db"
+  database: "madetech_handbook"
   collection_name: "docs"
 
 # Embeddings (must match the model used in 01_llm_chunking_embedding)
