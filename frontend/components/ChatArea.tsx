@@ -88,7 +88,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (!isLoading) onSend();
     }
   };
 
