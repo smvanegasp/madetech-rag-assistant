@@ -101,7 +101,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, theme }) =
               rel="noopener noreferrer"
               className={`underline underline-offset-2 transition-colors ${isDark ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-500'}`}
             >Sergio Vanegas</a>
-            , MBA student at Harvard Business School and former lead data scientist.
+            , MBA student at Harvard Business School and former Lead Data Scientist.
           </p>
 
           <div className={`rounded-xl p-4 text-xs space-y-1.5 ${isDark ? 'bg-zinc-800/60 text-zinc-400' : 'bg-zinc-50 text-zinc-500'}`}>
