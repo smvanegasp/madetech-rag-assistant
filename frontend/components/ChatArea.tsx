@@ -202,10 +202,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
-                  "Which cities does Made Tech have offices in?",
+                  "Where do we have offices?",
                   "What cycling benefits do we have?",
                   "Tell me about parental leave",
-                  "Describe me what a Lead Data Engineer does"
+                  "What a Lead Data Engineer does?"
                 ].map((q) => (
                   <button
                     key={q}
