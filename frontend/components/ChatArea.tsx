@@ -175,12 +175,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, [expandedCitations, isDark, onOpenSource, handbookDocs]);
 
   return (
-    <div className={`flex-1 flex flex-col relative h-full transition-all duration-300
+    <div className={`flex-1 flex flex-col relative h-full min-w-0 transition-all duration-300
       ${isDark ? 'bg-zinc-900' : 'bg-white'}`}>
       
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-8 sm:py-16 w-full scroll-smooth"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-8 sm:py-16 w-full scroll-smooth"
       >
         <div className="max-w-3xl mx-auto w-full">
           {/* Welcome Screen: Displays common questions if no messages exist */}
@@ -231,10 +231,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 key={message.id} 
                 className={`flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 ${message.role === 'user' ? 'items-end' : 'items-start'}`}
               >
-                <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed
-                  ${message.role === 'user' 
-                    ? (isDark ? 'bg-zinc-800 text-zinc-100' : 'bg-zinc-100 text-zinc-900') 
-                    : (isDark ? 'text-zinc-300' : 'text-zinc-800')}`}
+                <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed
+                  ${message.role === 'user'
+                    ? `max-w-[85%] sm:max-w-[80%] ${isDark ? 'bg-zinc-800 text-zinc-100' : 'bg-zinc-100 text-zinc-900'}`
+                    : `w-full min-w-0 ${isDark ? 'text-zinc-300' : 'text-zinc-800'}`}`}
                 >
                   {message.role === 'assistant' ? (
                     <MarkdownRenderer content={message.content} theme={theme} />

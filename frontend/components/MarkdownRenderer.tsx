@@ -103,7 +103,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       li: ({ children }: any) => <li className="mb-1">{hl(children)}</li>,
       em: ({ children }: any) => <em className="italic">{hl(children)}</em>,
       table: ({ children }: any) => (
-        <div className="overflow-x-auto my-6 rounded-xl border border-inherit shadow-sm">
+        <div className="overflow-x-auto max-w-full my-6 rounded-xl border border-inherit shadow-sm">
           <table className={`min-w-full border-collapse ${borderColor}`}>
             {children}
           </table>
