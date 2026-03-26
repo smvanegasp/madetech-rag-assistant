@@ -12,12 +12,14 @@ Request flow:
   /api/chat → RAGService.get_rag_response() → rag.pipeline.answer_question()
 
 Required environment variables:
-- GROQ_API_KEY, OPENAI_API_KEY
+- GROQ_API_KEY, OPENAI_API_KEY, DATABASE_URL
 - FRONTEND_PATH (optional, for production static serving)
 """
 
 import os
+import time
 from pathlib import Path
+from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -32,6 +34,7 @@ from utils.models import (
 from .config_loader import load_config
 from .handbook_loader import load_handbook_documents
 from .rag_service import RAGService
+from . import chat_logger
 
 # Load environment variables from .env or .env.local
 load_dotenv()
@@ -152,16 +155,34 @@ async def chat(request: ChatRequest):
                 status_code=503, 
                 detail="RAG service not initialized. Please ensure vector database is created."
             )
-        
+
+        # chat_id groups all messages in one conversation session.
+        # interaction_id uniquely identifies this single user/LLM exchange.
+        chat_id = request.chat_id or str(uuid4())
+        interaction_id = str(uuid4())
+        start_time = time.time()
+
         # Perform RAG query: retrieve context + generate response
         result = await rag_service.get_rag_response(
             query=request.query,
             history=request.history
         )
-        
+
+        response_time_ms = int((time.time() - start_time) * 1000)
+
+        chat_logger.log_message(
+            interaction_id=interaction_id,
+            chat_id=chat_id,
+            user_message=request.query,
+            llm_response=result["content"],
+            response_time_ms=response_time_ms,
+        )
+
         return ChatResponse(
             content=result["content"],
-            sources=result["sources"]
+            sources=result["sources"],
+            chat_id=chat_id,
+            interaction_id=interaction_id,
         )
     except Exception as e:
         print(f"Chat endpoint error: {e}")

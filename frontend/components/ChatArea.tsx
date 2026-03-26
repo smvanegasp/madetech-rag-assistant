@@ -45,11 +45,11 @@ interface ChatAreaProps {
   onOpenDisclaimer: () => void;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ 
-  messages, 
-  inputValue, 
-  setInputValue, 
-  onSend, 
+const ChatArea: React.FC<ChatAreaProps> = ({
+  messages,
+  inputValue,
+  setInputValue,
+  onSend,
   isLoading,
   onOpenSource,
   theme,
@@ -121,7 +121,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
     const distinctDocs: string[] = [];
     const seenDocIds = new Set<string>();
-    
+
     message.sources.forEach(s => {
       if (!seenDocIds.has(s.docId)) {
         distinctDocs.push(s.docId);
@@ -144,8 +144,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 key={`${message.id}-${idx}`}
                 onClick={() => onOpenSource(message.sources!, docId, message.id)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all border
-                  ${isDark 
-                    ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-emerald-500/50 hover:text-zinc-200' 
+                  ${isDark
+                    ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-emerald-500/50 hover:text-zinc-200'
                     : 'bg-white border-zinc-200 text-zinc-600 hover:border-emerald-500 hover:text-emerald-600'}`}
               >
                 <FileText size={12} className="text-zinc-400" />
@@ -158,8 +158,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={() => toggleCitations(message.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
-                ${isDark 
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200' 
+                ${isDark
+                  ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'
                   : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200'}`}
             >
               {isExpanded ? (
@@ -177,8 +177,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className={`flex-1 flex flex-col relative h-full min-w-0 transition-all duration-300
       ${isDark ? 'bg-zinc-900' : 'bg-white'}`}>
-      
-      <div 
+
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-8 sm:py-16 w-full scroll-smooth"
       >
@@ -190,7 +190,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 ${isDark ? 'bg-zinc-800 border-zinc-700 text-emerald-500' : 'bg-emerald-500 border-emerald-400 text-white'}`}>
                 <BookOpen size={24} />
               </div>
-              
+
               <div className="space-y-2">
                 <h1 className={`text-2xl font-semibold tracking-tight ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
                   Knowledge Search
@@ -203,9 +203,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
                   "Which cities does Made Tech have offices in?",
-                  "How do I get confidential advice if I'm struggling?",
-                  "Do all employees sign confidentiality agreements?",
-                  "How often are laptops replaced for non-engineer roles?"
+                  "What cycling benefits do we have?",
+                  "Tell me about parental leave",
+                  "Describe me what a Lead Data Engineer does"
                 ].map((q) => (
                   <button
                     key={q}
@@ -213,8 +213,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                       setInputValue(q);
                     }}
                     className={`p-4 text-left text-sm rounded-xl border transition-all
-                      ${isDark 
-                        ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 text-zinc-400' 
+                      ${isDark
+                        ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 text-zinc-400'
                         : 'bg-white border-zinc-200 hover:border-emerald-500/30 hover:bg-emerald-50/10 text-zinc-600'}`}
                   >
                     {q}
@@ -227,8 +227,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Messages */}
           <div className="space-y-12">
             {messages.map((message) => (
-              <div 
-                key={message.id} 
+              <div
+                key={message.id}
                 className={`flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 ${message.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed
@@ -261,8 +261,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       {/* Input Area */}
       <div className={`p-4 sm:p-6 border-t ${isDark ? 'border-zinc-800 bg-zinc-950/50' : 'border-zinc-100 bg-white/50'} backdrop-blur-md`}>
         <div className={`max-w-3xl mx-auto flex flex-col rounded-2xl border overflow-hidden transition-all
-          ${isDark 
-            ? 'border-zinc-800 bg-zinc-950 focus-within:border-zinc-700' 
+          ${isDark
+            ? 'border-zinc-800 bg-zinc-950 focus-within:border-zinc-700'
             : 'border-zinc-200 bg-white shadow-sm focus-within:border-emerald-500 focus-within:shadow-emerald-500/10'}`}>
           <textarea
             ref={textareaRef}

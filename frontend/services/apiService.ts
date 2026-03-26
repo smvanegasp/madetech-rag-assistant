@@ -34,7 +34,7 @@ export async function getHandbookDocs(): Promise<HandbookDoc[]> {
  * Executes a RAG query to generate a handbook-backed response.
  * Replaces the direct Gemini API call from geminiService.ts
  */
-export async function getHandbookResponse(query: string, history: Message[]) {
+export async function getHandbookResponse(query: string, history: Message[], chatId?: string) {
   try {
     const response = await fetch(`${API_URL}/api/chat`, {
       method: 'POST',
@@ -48,7 +48,8 @@ export async function getHandbookResponse(query: string, history: Message[]) {
           role: m.role,
           content: m.content,
           timestamp: m.timestamp
-        }))
+        })),
+        chat_id: chatId ?? null
       })
     });
 
@@ -61,7 +62,9 @@ export async function getHandbookResponse(query: string, history: Message[]) {
     console.error("API Communication Error:", error);
     return {
       content: "I'm having trouble connecting to the knowledge base right now. Please try again in a moment.",
-      sources: []
+      sources: [],
+      chat_id: null,
+      interaction_id: null
     };
   }
 }

@@ -168,7 +168,7 @@ const App: React.FC = () => {
     }));
 
     try {
-      const response = await getHandbookResponse(userQuery, currentChat?.messages || []);
+      const response = await getHandbookResponse(userQuery, currentChat?.messages || [], currentChat?.dbChatId);
       const assistantMessageId = Math.random().toString(36).substring(7);
       
       const assistantMessage: Message = {
@@ -187,7 +187,8 @@ const App: React.FC = () => {
               messages: [...chat.messages, assistantMessage], 
               updatedAt: new Date(),
               isLoading: false,
-              hasUnreadResponse: isBackground
+              hasUnreadResponse: isBackground,
+              dbChatId: chat.dbChatId ?? response.chat_id ?? undefined,
             };
           }
           return chat;

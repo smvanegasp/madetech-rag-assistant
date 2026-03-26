@@ -208,6 +208,7 @@ class ChatRequest(BaseModel):
 
     query: str
     history: List[Message] = []
+    chat_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -215,5 +216,7 @@ class ChatResponse(BaseModel):
 
     content: str
     sources: List[SourceChunk]
+    chat_id: str
+    interaction_id: str
 
 

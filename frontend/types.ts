@@ -32,6 +32,8 @@ export interface Chat {
   isLoading?: boolean;
   hasUnreadResponse?: boolean;
   isCustomTitle?: boolean;
+  /** Backend-assigned UUID that groups all interactions in this conversation */
+  dbChatId?: string;
 }
 
 /** Determines if the Source Viewer shows just fragments or the whole doc */
