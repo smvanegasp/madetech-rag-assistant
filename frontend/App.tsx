@@ -22,9 +22,10 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SourceViewer from './components/SourceViewer';
 import WelcomeModal from './components/WelcomeModal';
+import ContactModal from './components/ContactModal';
 import { Chat, Message, SourceChunk, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
 import { getHandbookResponse, getHandbookDocs } from './services/apiService';
-import { PanelRight, Bell, BellRing } from 'lucide-react';
+import { PanelRight, MessageCircleHeart } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- UI STATE ---
@@ -32,10 +33,10 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [sourceViewerOpen, setSourceViewerOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<SelectedSource | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showWelcome, setShowWelcome] = useState<boolean>(
     () => !localStorage.getItem('welcomeSeen')
   );
+  const [showContact, setShowContact] = useState(false);
 
   const handleCloseWelcome = useCallback(() => {
     localStorage.setItem('welcomeSeen', '1');
@@ -120,7 +121,6 @@ const App: React.FC = () => {
   }, [chats.length, handleNewChat]);
 
   const currentChat = chats.find(c => c.id === currentChatId);
-  const unreadChats = chats.filter(c => c.hasUnreadResponse);
 
   /**
    * Handles sending a user message and receiving the AI response.
@@ -267,45 +267,15 @@ const App: React.FC = () => {
               {currentChat?.title || 'Nexus AI'}
             </div>
           </div>
-          <div className="relative flex items-center gap-2">
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              aria-label="Activity Feed"
-              className={`p-2 rounded-lg transition-all relative ${isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}
+          {/* Feedback button — header on mobile, hidden on desktop (floating button used instead) */}
+          <div className="flex items-center sm:hidden">
+            <button
+              onClick={() => setShowContact(true)}
+              aria-label="Feedback & Contact"
+              className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}
             >
-              {unreadChats.length > 0 ? (
-                <BellRing size={18} className="text-emerald-500 animate-pulse" />
-              ) : (
-                <Bell size={18} />
-              )}
-              {unreadChats.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full border border-white dark:border-zinc-900"></span>
-              )}
+              <MessageCircleHeart size={18} />
             </button>
-            {showNotifications && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                <div className={`absolute right-0 top-full mt-2 w-64 rounded-xl border shadow-xl z-50 p-2 animate-in slide-in-from-top-2 duration-200
-                  ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
-                  <div className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-wider">Activity Feed</div>
-                  <div className="space-y-1 max-h-60 overflow-y-auto">
-                    {unreadChats.length === 0 ? (
-                      <div className="px-3 py-4 text-xs text-zinc-400 text-center italic">No new activity.</div>
-                    ) : (
-                      unreadChats.map(c => (
-                        <button key={c.id} onClick={() => { setCurrentChatId(c.id); setShowNotifications(false); }} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-50'}`}>
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium truncate">{c.title}</div>
-                            <div className="text-[10px] text-zinc-500">New response waiting</div>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
         </header>
 
@@ -348,9 +318,25 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Floating feedback button — desktop only, mobile uses header button instead */}
+      <button
+        onClick={() => setShowContact(true)}
+        aria-label="Feedback & Contact"
+        className="hidden sm:flex fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95
+          text-white shadow-lg hover:shadow-emerald-500/30 hover:shadow-xl transition-all duration-200 items-center justify-center"
+      >
+        <MessageCircleHeart size={20} />
+      </button>
+
       <WelcomeModal
         isOpen={showWelcome}
         onClose={handleCloseWelcome}
+        theme={theme}
+      />
+
+      <ContactModal
+        isOpen={showContact}
+        onClose={() => setShowContact(false)}
         theme={theme}
       />
     </div>

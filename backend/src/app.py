@@ -29,12 +29,14 @@ from dotenv import load_dotenv
 from utils.models import (
     ChatRequest,
     ChatResponse,
+    ContactRequest,
     HandbookDoc,
 )
 from .config_loader import load_config
 from .handbook_loader import load_handbook_documents
 from .rag_service import RAGService
 from . import chat_logger
+from .contact_service import send_contact_email
 
 # Load environment variables from .env or .env.local
 load_dotenv()
@@ -122,6 +124,30 @@ async def get_handbook():
         list[dict]: Array of HandbookDoc objects with id, title, category, content
     """
     return [doc.model_dump() for doc in handbook_docs]
+
+
+@app.post("/api/contact", status_code=204)
+async def contact(request: ContactRequest):
+    """
+    Contact / feedback endpoint.
+
+    Sends an email to the configured CONTACT_EMAIL address via Resend.
+    Subject is prefixed with [Feedback] or [Get in Touch] depending on type.
+
+    Returns 204 No Content on success.
+    Raises:
+        HTTPException 500: If the email could not be sent.
+    """
+    try:
+        send_contact_email(
+            contact_type=request.contact_type,
+            name=request.name,
+            email=request.email,
+            message=request.message,
+        )
+    except Exception as e:
+        print(f"Contact endpoint error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send message. Please try again later.")
 
 
 @app.post("/api/chat", response_model=ChatResponse)

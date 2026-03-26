@@ -203,6 +203,15 @@ class Message(BaseModel):
     timestamp: Optional[datetime] = None
 
 
+class ContactRequest(BaseModel):
+    """Request payload for the contact/feedback endpoint."""
+
+    contact_type: Literal["feedback", "contact"]
+    name: str
+    email: str
+    message: str
+
+
 class ChatRequest(BaseModel):
     """Request payload for the chat endpoint."""
 
