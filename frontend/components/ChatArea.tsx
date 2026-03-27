@@ -271,7 +271,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search handbook documents..."
-            enterKeyHint={isTouchDevice ? 'send' : 'enter'}
+            enterKeyHint={isTouchDevice ? 'enter' : 'send'}
             rows={1}
             className={`w-full bg-transparent pl-4 pr-4 pt-3.5 pb-1 text-sm outline-none resize-none overflow-y-auto
               ${isDark ? 'text-zinc-200 placeholder:text-zinc-600' : 'text-zinc-900 placeholder:text-zinc-400'}`}
