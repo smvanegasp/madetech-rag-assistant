@@ -12,19 +12,14 @@ import psycopg2
 
 logger = logging.getLogger(__name__)
 
-_conn = None
-
-
 def _get_connection():
-    """Return a cached psycopg2 connection, reconnecting if closed."""
-    global _conn
-    if _conn is None or _conn.closed:
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            raise ValueError("DATABASE_URL environment variable not set")
-        _conn = psycopg2.connect(database_url)
-        _conn.autocommit = True
-    return _conn
+    """Open and return a new psycopg2 connection for the current call."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL environment variable not set")
+    conn = psycopg2.connect(database_url)
+    conn.autocommit = True
+    return conn
 
 
 def log_message(
@@ -39,6 +34,7 @@ def log_message(
     Never raises — errors are logged so the chat endpoint is never broken
     by a database failure.
     """
+    conn = None
     try:
         conn = _get_connection()
         with conn.cursor() as cur:
@@ -59,3 +55,6 @@ def log_message(
             )
     except Exception as e:
         logger.error("Failed to log chat message: %s", e)
+    finally:
+        if conn is not None:
+            conn.close()

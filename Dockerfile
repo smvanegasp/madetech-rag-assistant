@@ -159,4 +159,4 @@ EXPOSE 9481
 # --host 0.0.0.0: Listen on all network interfaces (required for Docker)
 # --port 9481: Listen on port 9481
 # backend.src.app:app: Module path and FastAPI app instance
-CMD ["uvicorn", "backend.src.app:app", "--host", "0.0.0.0", "--port", "9481"]
+CMD ["uvicorn", "backend.src.app:app", "--host", "0.0.0.0", "--port", "9481", "--workers", "4"]

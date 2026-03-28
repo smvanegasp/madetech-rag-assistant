@@ -12,6 +12,7 @@ Configuration (config.yaml):
 Required env: GROQ_API_KEY, OPENAI_API_KEY
 """
 
+import asyncio
 import os
 from typing import Any, Dict, List
 
@@ -142,7 +143,8 @@ class RAGService:
                 "use_query_rewriting": self.config.get("use_query_rewriting", False),
                 "use_reranking": self.config.get("use_reranking", False),
             }
-            answer, chunks = answer_question(
+            answer, chunks = await asyncio.to_thread(
+                answer_question,
                 query,
                 history=history_msgs,
                 collection=self.collection,
