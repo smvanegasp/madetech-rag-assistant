@@ -7,6 +7,8 @@ E.g. "What about parental leave?" + history → "parental leave policy Made Tech
 from litellm import completion
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from utils.prompts import REWRITE_QUERY_SYSTEM_PROMPT
+
 
 @retry(wait=wait_exponential(multiplier=1, min=10, max=240), stop=stop_after_attempt(5))
 def rewrite_query(
@@ -24,29 +26,6 @@ def rewrite_query(
         f"{msg.get('role', 'user')}: {msg.get('content', '')}" for msg in history
     ) if history else "(No prior messages)"
 
-    message = f"""
-You are in a conversation with a user, answering questions about the company Made Tech.
-You are about to look up information in a Knowledge Base to answer the user's question.
-
-This is the history of your conversation so far with the user:
-
-[HISTORY STARTS]
-
-{history_text}
-
-[HISTORY ENDS]
-
-And this is the user's current question:
-
-[QUESTION STARTS]
-
-{question}
-
-[QUESTION ENDS]
-
-Respond only with a short, refined question that you will use to search the Knowledge Base.
-It should be a VERY short specific question most likely to surface content. Focus on the question details.
-IMPORTANT: Respond ONLY with the precise knowledgebase query, nothing else.
-"""
-    response = completion(model=model, messages=[{"role": "system", "content": message}])
+    system_prompt = REWRITE_QUERY_SYSTEM_PROMPT.format(history=history_text, question=question)
+    response = completion(model=model, messages=[{"role": "system", "content": system_prompt}])
     return response.choices[0].message.content

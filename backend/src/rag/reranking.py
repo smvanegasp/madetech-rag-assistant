@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.models import Result
+from utils.prompts import RERANK_CHUNKS_SYSTEM_PROMPT
 
 
 class RankOrder(BaseModel):
@@ -69,17 +70,6 @@ def rerank(question: str, chunks: list[Result], model: str) -> list[Result]:
     n = len(chunks)
     valid_ids = set(range(1, n + 1))
 
-    system_prompt = """
-You are a document re-ranker.
-You are provided with a question and a list of relevant chunks of text from a query of a knowledge base.
-The chunks are provided in the order they were retrieved; this should be approximately ordered by relevance, but you may be able to improve on that.
-You must rank order the provided chunks by relevance to the question, with the most relevant chunk first.
-
-CRITICAL: You must respond with valid JSON. The "order" field must be a JSON array of integers, with each integer separated by a comma.
-Example for 5 chunks: {"order": [5, 3, 2, 4, 1]}
-Example for 17 chunks: {"order": [1, 2, 4, 9, 3, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17]}
-Each chunk ID (1 to N) must appear exactly once. Use commas between every number.
-"""
     user_prompt = f"The user has asked the following question:\n\n{question}\n\nOrder all {n} chunks by relevance, from most to least relevant. Include every chunk ID from 1 to {n} exactly once.\n\n"
     user_prompt += "Here are the chunks:\n\n"
     for index, chunk in enumerate(chunks):
@@ -89,7 +79,7 @@ Each chunk ID (1 to N) must appear exactly once. Use commas between every number
     response = completion(
         model=model,
         messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": RERANK_CHUNKS_SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
         response_format=RankOrder,
