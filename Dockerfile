@@ -60,11 +60,11 @@ COPY frontend/ ./
 # - Without SPACE_HOST: Uses empty string (relative URLs for same-origin)
 ENV VITE_APP_ENV=production
 RUN if [ -n "$SPACE_HOST" ]; then \
-        echo "Building with SPACE_HOST: $SPACE_HOST"; \
-        VITE_BACKEND_URL="https://$SPACE_HOST" pnpm build; \
+    echo "Building with SPACE_HOST: $SPACE_HOST"; \
+    VITE_BACKEND_URL="https://$SPACE_HOST" pnpm build; \
     else \
-        echo "Building without SPACE_HOST (using same-origin URLs)"; \
-        VITE_BACKEND_URL="" pnpm build; \
+    echo "Building without SPACE_HOST (using same-origin URLs)"; \
+    VITE_BACKEND_URL="" pnpm build; \
     fi
 
 # Build output: /app/frontend/dist/ contains static HTML, JS, CSS
@@ -159,4 +159,4 @@ EXPOSE 9481
 # --host 0.0.0.0: Listen on all network interfaces (required for Docker)
 # --port 9481: Listen on port 9481
 # backend.src.app:app: Module path and FastAPI app instance
-CMD ["uvicorn", "backend.src.app:app", "--host", "0.0.0.0", "--port", "9481", "--workers", "8"]
+CMD ["uvicorn", "backend.src.app:app", "--host", "0.0.0.0", "--port", "9481", "--workers", "2"]
