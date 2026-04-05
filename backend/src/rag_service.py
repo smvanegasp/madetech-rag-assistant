@@ -21,7 +21,8 @@ from openai import OpenAI
 from utils.models import Message, SourceChunk
 
 from .config_loader import load_config
-from .rag import answer_question, get_chroma_collection
+from .rag import get_chroma_collection
+from .rag.agent_pipeline import answer_question_agent
 
 load_dotenv(override=True)
 
@@ -144,7 +145,7 @@ class RAGService:
                 "use_reranking": self.config.get("use_reranking", False),
             }
             answer, chunks = await asyncio.to_thread(
-                answer_question,
+                answer_question_agent,
                 query,
                 history=history_msgs,
                 collection=self.collection,

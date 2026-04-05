@@ -77,18 +77,18 @@
 
 *Goal: Migrate to a proper agent framework first, then build new tools on top of it. This avoids building tools twice — once in the current manual approach and again after migration.*
 
-### 3.1 SDK Migration
+### 3.1 SDK Migration — COMPLETED
 
-- **[COLLAB]** Evaluate and migrate to OpenAI Agents SDK: Refactor the backend to use the OpenAI Agents SDK (or similar) for structured agent orchestration. This replaces the current manual tool-calling approach and gives better tool configuration, structured outputs, and multi-agent support. *(Major architectural decision — you plan the migration; Claude Code executes the refactor.)*
-- **[CLAUDE-CODE]** Improve structured outputs with Pydantic: Once on the new SDK, define strict Pydantic models for all tool inputs/outputs to get reliable structured responses from the LLM.
+- ~~**[COLLAB]** Evaluate and migrate to OpenAI Agents SDK~~ — Done: migrated from manual LiteLLM 2-phase tool calling to OpenAI Agents SDK with `@function_tool` decorator. New `agent_pipeline.py` collapses the pipeline into a single `Runner.run_sync()` call. Uses `LitellmModel` to keep `groq/openai/gpt-oss-20b` (no cost change). Old `pipeline.py` kept for experiment backward compatibility.
+- ~~**[CLAUDE-CODE]** Improve structured outputs with Pydantic~~ — Done: Pydantic models were already sufficient. `RAGContext` dataclass added for agent state. Tool input schema auto-generated from function signature by the SDK.
 
-### 3.2 New Backend Tools (post-migration)
+### 3.2 New Backend Tools (post-migration) — COMPLETED
 
 *These were originally Phase 2.1. Moved here so they are built on the new SDK rather than the manual tool-calling approach.*
 
-- **[CLAUDE-CODE]** Create a "send feedback" tool: Build a new tool that the LLM can call when the user wants to give feedback. It should collect the message and log it (via Supabase or Resend email). Wire it into the existing `contact_service.py`.
-- **[CLAUDE-CODE]** Create a "get in touch" tool: Similar to above but for contact requests — the LLM detects intent, collects details, and triggers an email or logs the request.
-- **[CLAUDE-CODE]** Add input guardrails: Implement validation so the assistant only answers questions in English that are related to MadeTech or the application. Reject or politely redirect off-topic or non-English queries.
+- ~~**[CLAUDE-CODE]** Create a "send feedback" tool~~ — Done: `@function_tool send_feedback` collects name, email, message and calls `contact_service.py`. LLM asks for missing fields before calling.
+- ~~**[CLAUDE-CODE]** Create a "get in touch" tool~~ — Done: `@function_tool get_in_touch` same pattern for contact requests. Both tools registered in the Nexus agent.
+- ~~**[CLAUDE-CODE]** Add input guardrails~~ — Done: added to system prompt. Non-English → asks to rephrase in English. Off-topic → redirects to Made Tech topics. Gibberish → asks to clarify. All tested and working.
 
 ### 3.3 Multi-Tool Orchestration
 
