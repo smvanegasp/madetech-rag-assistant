@@ -17,7 +17,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Message, SourceChunk, Theme, HandbookDoc } from '../types';
 
@@ -33,6 +33,8 @@ interface ChatAreaProps {
   setInputValue: (val: string) => void;
   /** Callback triggered when user sends a message */
   onSend: () => void;
+  /** Callback triggered when user clicks retry on an error message */
+  onRetry: () => void;
   /** Whether the AI is currently generating a response */
   isLoading: boolean;
   /** Callback to open source viewer for a specific document */
@@ -50,6 +52,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   inputValue,
   setInputValue,
   onSend,
+  onRetry,
   isLoading,
   onOpenSource,
   theme,
@@ -210,7 +213,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   <BookOpen size={20} />
                 </div>
                 <h1 className={`text-2xl font-semibold tracking-tight ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                  Knowledge Search
+                  Welcome to Nexus
                 </h1>
               </div>
 
@@ -222,7 +225,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
-                  "Where do we have offices?",
+                  "Tell me more about this app",
                   "What cycling benefits do we have?",
                   "Tell me about parental leave",
                   "What a Lead Data Engineer does?"
@@ -262,7 +265,19 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     <p>{message.content}</p>
                   )}
                 </div>
-                {message.role === 'assistant' && renderCitations(message)}
+                {message.isError && (
+                  <button
+                    onClick={onRetry}
+                    className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
+                      ${isDark
+                        ? 'border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-400'
+                        : 'border-zinc-200 text-zinc-500 hover:border-emerald-500 hover:text-emerald-600'}`}
+                  >
+                    <RotateCcw size={12} />
+                    Try again
+                  </button>
+                )}
+                {message.role === 'assistant' && !message.isError && renderCitations(message)}
               </div>
             ))}
 

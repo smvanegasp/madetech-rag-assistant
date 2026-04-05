@@ -136,10 +136,12 @@ const App: React.FC = () => {
    * The unread notification system tracks responses that arrive while the user
    * is viewing a different chat, allowing them to return later.
    */
-  const handleSend = async () => {
-    if (!inputValue.trim() || !currentChatId) return;
+  const handleSend = async (retryQuery?: string) => {
+    const isRetry = typeof retryQuery === 'string' && retryQuery.length > 0;
+    const query = isRetry ? retryQuery : inputValue.trim();
+    if (!query || !currentChatId) return;
 
-    const userQuery = inputValue.trim();
+    const userQuery = query;
     const activeChatId = currentChatId;
     setInputValue('');
 
@@ -177,6 +179,7 @@ const App: React.FC = () => {
         content: response.content,
         sources: response.sources,
         timestamp: new Date(),
+        isError: response.isError || false,
       };
 
       setChats(prev => prev.map(chat => {
@@ -196,11 +199,71 @@ const App: React.FC = () => {
 
     } catch (err) {
       console.error("Critical AI Communication Error:", err);
-      setChats(prev => prev.map(chat => 
-        chat.id === activeChatId ? { ...chat, isLoading: false } : chat
+      const errorMessage: Message = {
+        id: Math.random().toString(36).substring(7),
+        role: 'assistant',
+        content: "I'm having trouble connecting right now. Please check your connection and try again.",
+        timestamp: new Date(),
+        isError: true,
+      };
+      setChats(prev => prev.map(chat =>
+        chat.id === activeChatId ? { ...chat, messages: [...chat.messages, errorMessage], isLoading: false } : chat
       ));
     }
   };
+
+  const handleRetry = useCallback(async () => {
+    if (!currentChatId) return;
+    const chat = chats.find(c => c.id === currentChatId);
+    if (!chat) return;
+    const lastUserMsg = [...chat.messages].reverse().find(m => m.role === 'user');
+    if (!lastUserMsg) return;
+    const activeChatId = currentChatId;
+
+    // Remove error messages and set loading
+    setChats(prev => prev.map(c =>
+      c.id === activeChatId ? { ...c, messages: c.messages.filter(m => !m.isError), isLoading: true } : c
+    ));
+
+    try {
+      const messagesWithoutError = chat.messages.filter(m => !m.isError);
+      const response = await getHandbookResponse(lastUserMsg.content, messagesWithoutError, chat.dbChatId);
+      const assistantMessage: Message = {
+        id: Math.random().toString(36).substring(7),
+        role: 'assistant',
+        content: response.content,
+        sources: response.sources,
+        timestamp: new Date(),
+        isError: response.isError || false,
+      };
+      setChats(prev => prev.map(c => {
+        if (c.id === activeChatId) {
+          const isBackground = currentChatIdRef.current !== activeChatId;
+          return {
+            ...c,
+            messages: [...c.messages.filter(m => !m.isError), assistantMessage],
+            updatedAt: new Date(),
+            isLoading: false,
+            hasUnreadResponse: isBackground,
+            dbChatId: c.dbChatId ?? response.chat_id ?? undefined,
+          };
+        }
+        return c;
+      }));
+    } catch (err) {
+      console.error("Retry failed:", err);
+      const errorMessage: Message = {
+        id: Math.random().toString(36).substring(7),
+        role: 'assistant',
+        content: "I'm having trouble connecting right now. Please check your connection and try again.",
+        timestamp: new Date(),
+        isError: true,
+      };
+      setChats(prev => prev.map(c =>
+        c.id === activeChatId ? { ...c, messages: [...c.messages.filter(m => !m.isError), errorMessage], isLoading: false } : c
+      ));
+    }
+  }, [currentChatId, chats]);
 
   const handleDeleteChat = useCallback((id: string) => {
     setChats(prev => prev.filter(c => c.id !== id));
@@ -264,7 +327,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex-1 flex justify-center px-4 sm:px-8">
             <div className={`text-sm font-semibold tracking-tight ${isDark ? 'text-zinc-400' : 'text-zinc-500'} truncate max-w-[150px] sm:max-w-md`}>
-              {currentChat?.title || 'Nexus AI'}
+              {currentChat?.title || 'Nexus'}
             </div>
           </div>
           {/* Feedback button — header on mobile, hidden on desktop (floating button used instead) */}
@@ -280,11 +343,12 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 flex overflow-hidden">
-          <ChatArea 
+          <ChatArea
             messages={currentChat?.messages || []}
             inputValue={inputValue}
             setInputValue={setInputValue}
             onSend={handleSend}
+            onRetry={handleRetry}
             isLoading={currentChat?.isLoading || false}
             onOpenSource={handleOpenSource}
             theme={theme}

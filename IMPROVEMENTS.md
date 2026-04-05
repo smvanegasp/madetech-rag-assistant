@@ -25,12 +25,12 @@
 - Send button repositioned inline next to textarea (was in its own row below) for a cleaner, more space-efficient input bar.
 - Welcome screen book icon moved inline next to "Knowledge Search" title to avoid clipping on short viewports (e.g., Chrome on iPhone).
 
-### 1.2 Frontend Quick Enhancements
+### 1.2 Frontend Quick Enhancements — COMPLETED
 
-- **[CLAUDE-CODE]** Add favicon: Add a favicon to `frontend/index.html`.
-- **[COLLAB]** Give the assistant a name: Choose a name and display it in the welcome popup and chat header to make the experience more personal. *(You decide the name; Claude Code implements it.)*
-- **[CLAUDE-CODE]** Update first sample question: Set the initial suggested question to something like *"Tell me more about this app"* so new users understand what they're interacting with.
-- **[CLAUDE-CODE]** Add a "Try again" button on error: When the assistant returns the "I'm having trouble connecting…" error, show a button the user can click to retry the last message instead of re-typing.
+- ~~**[CLAUDE-CODE]** Add favicon~~ — Done: inline SVG favicon (book icon on emerald-green rounded square) added to `index.html`.
+- ~~**[COLLAB]** Give the assistant a name~~ — Done: named "Nexus". Updated page title, header fallback, welcome screen, welcome modal, and both backend system prompts (`TOOL_DECISION_SYSTEM_PROMPT`, `RAG_SYSTEM_PROMPT`).
+- ~~**[CLAUDE-CODE]** Update first sample question~~ — Done: changed to "Tell me more about this app".
+- ~~**[CLAUDE-CODE]** Add a "Try again" button on error~~ — Done: API errors show a retry button that re-sends the original user message with the error cleared from history.
 
 ### 1.3 System Prompt Improvements (Backend)
 

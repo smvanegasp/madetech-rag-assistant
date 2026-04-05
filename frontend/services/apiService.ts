@@ -64,7 +64,8 @@ export async function getHandbookResponse(query: string, history: Message[], cha
       content: "I'm having trouble connecting to the knowledge base right now. Please try again in a moment.",
       sources: [],
       chat_id: null,
-      interaction_id: null
+      interaction_id: null,
+      isError: true
     };
   }
 }

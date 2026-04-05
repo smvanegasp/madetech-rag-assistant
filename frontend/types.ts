@@ -22,6 +22,7 @@ export interface Message {
   content: string;
   sources?: SourceChunk[];
   timestamp: Date;
+  isError?: boolean;
 }
 
 export interface Chat {

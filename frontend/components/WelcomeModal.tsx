@@ -63,7 +63,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, theme }) =
               id="welcome-title"
               className={`text-base font-semibold tracking-tight ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}
             >
-              Made Tech Handbook Assistant
+              Welcome to Nexus
             </h2>
             <p className={`mt-0.5 text-xs ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
               Academic project · Non-commercial
