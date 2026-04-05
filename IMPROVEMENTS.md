@@ -69,7 +69,7 @@
 
 - ~~**[COLLAB]** Investigate double query rewriting~~ — Done: notebook `08_double_rewriting_investigation.ipynb` tested 8 scenarios (follow-ups, pronoun references, topic switches, standalone questions). Conclusion: the orchestrator LLM already rewrites queries when calling the `search_handbook` tool — its rewrites are as good or better than the explicit `query_rewriting.py` step. Combined with the experiment results showing basic RAG (no rewriting) as the best configuration, the explicit rewriting step is confirmed redundant. Production `config.yaml` already has `use_query_rewriting: true` but this can be safely disabled.
 - ~~**[COLLAB]** Test latency with alternative models~~ — Done: benchmarked `groq/openai/gpt-oss-20b`, `openai/gpt-4o-mini`, and `groq/llama-3.1-8b-instant` across RAG variants. Added latency tracking (mean/p50/p95), failure rate tracking (RAG errors vs judge/structured output errors), and latency + failure plots to the experiment framework. Best configuration: basic RAG with `groq/openai/gpt-oss-20b` (no rewriting, no reranking). Judge model upgraded to `groq/llama-3.3-70b-versatile`.
-- **[MANUAL]** Evaluate Supabase pause risk: Determine what happens if Supabase pauses your project after inactivity. Decide if chat logging is critical enough to warrant a paid tier or an alternative (e.g., simple file logging as fallback).
+- ~~**[MANUAL]** Evaluate Supabase pause risk~~ — Done: tested with `DATABASE_URL` unavailable. Chat works correctly — logging fails gracefully with no impact on the user experience. Chat analytics are lost when Supabase is paused but the core RAG pipeline is unaffected. Acceptable trade-off for free tier.
 
 ---
 
