@@ -371,7 +371,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                   <Loader2 size={16} className="animate-spin text-emerald-500" />
                 </div>
-                <div className="text-xs font-medium text-emerald-500 tracking-wide uppercase">AI is analyzing handbook...</div>
+                <div className="text-xs font-medium text-emerald-500 tracking-wide uppercase">Nexus is thinking...</div>
               </div>
             )}
           </div>

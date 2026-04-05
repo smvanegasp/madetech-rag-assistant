@@ -125,26 +125,43 @@ def get_in_touch(ctx: RunContextWrapper[RAGContext], name: str, email: str, mess
 
 
 def _extract_tool_steps(result) -> list[dict]:
-    """Extract tool call metadata from the agent RunResult."""
-    from agents.items import ToolCallItem
+    """Extract tool call metadata from the agent RunResult.
 
+    Skips tool calls that were rejected by validation (e.g., missing contact fields).
+    Pairs each ToolCallItem with its following ToolCallOutputItem to check the output.
+    """
+    from agents.items import ToolCallItem, ToolCallOutputItem
+
+    # Build list of (call, output) pairs
+    items = result.new_items
     steps = []
     order = 1
-    for item in result.new_items:
-        if isinstance(item, ToolCallItem):
-            raw = item.raw_item
-            tool_name = getattr(raw, "name", "unknown")
-            arguments_str = getattr(raw, "arguments", "{}")
-            try:
-                arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
-            except (json.JSONDecodeError, TypeError):
-                arguments = {}
-            steps.append({
-                "tool_name": tool_name,
-                "arguments": arguments,
-                "order": order,
-            })
-            order += 1
+    for i, item in enumerate(items):
+        if not isinstance(item, ToolCallItem):
+            continue
+        raw = item.raw_item
+        tool_name = getattr(raw, "name", "unknown")
+        arguments_str = getattr(raw, "arguments", "{}")
+        try:
+            arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
+        except (json.JSONDecodeError, TypeError):
+            arguments = {}
+
+        # Check if the next item is a ToolCallOutputItem with a validation rejection
+        output_str = ""
+        if i + 1 < len(items) and isinstance(items[i + 1], ToolCallOutputItem):
+            output_str = str(items[i + 1].output) if items[i + 1].output else ""
+
+        # Skip failed validation calls (contact/feedback tools that were rejected)
+        if output_str.startswith("You don't have"):
+            continue
+
+        steps.append({
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "order": order,
+        })
+        order += 1
     return steps
 
 
