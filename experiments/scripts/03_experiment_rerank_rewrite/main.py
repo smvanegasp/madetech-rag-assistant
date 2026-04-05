@@ -100,40 +100,60 @@ def _init_eval_worker(collection_name: str, database: str, env_path: str) -> Non
 
 
 def _process_qa(qa, exp_config: dict) -> dict:
-    """Evaluate a single QA pair (runs in worker process)."""
+    """Evaluate a single QA pair (runs in worker process). Tracks RAG and judge failures separately."""
     global _worker_collection, _worker_client
-    from evaluation import evaluate_answer
+    from evaluation import generate_answer, judge_answer
 
+    base = {
+        "question": qa.question,
+        "expected_answer": qa.answer,
+        "question_type": qa.question_type,
+    }
+
+    # Step 1: RAG generation
     try:
-        eval_result, generated_answer, _ = evaluate_answer(
+        generated_answer, _, latency = generate_answer(
             qa,
             config=exp_config,
             collection=_worker_collection,
             openai_client=_worker_client,
-            model=exp_config["model"],
         )
-        return {
-            "question": qa.question,
-            "expected_answer": qa.answer,
-            "question_type": qa.question_type,
-            "accuracy": eval_result.accuracy,
-            "completeness": eval_result.completeness,
-            "relevance": eval_result.relevance,
-            "feedback": eval_result.feedback,
-            "generated_answer": generated_answer,
-        }
     except Exception as e:
         return {
-            "question": qa.question,
-            "expected_answer": qa.answer,
-            "question_type": qa.question_type,
-            "accuracy": None,
-            "completeness": None,
-            "relevance": None,
-            "feedback": str(e),
-            "generated_answer": None,
-            "error": str(e),
+            **base,
+            "accuracy": None, "completeness": None, "relevance": None,
+            "feedback": None, "generated_answer": None,
+            "latency_seconds": None,
+            "rag_error": str(e), "judge_error": None,
         }
+
+    # Step 2: LLM-as-judge (structured output)
+    try:
+        eval_result = judge_answer(
+            qa.question,
+            generated_answer,
+            qa.answer,
+            model=exp_config["judge_model"],
+        )
+    except Exception as e:
+        return {
+            **base,
+            "accuracy": None, "completeness": None, "relevance": None,
+            "feedback": None, "generated_answer": generated_answer,
+            "latency_seconds": round(latency, 2),
+            "rag_error": None, "judge_error": str(e),
+        }
+
+    return {
+        **base,
+        "accuracy": eval_result.accuracy,
+        "completeness": eval_result.completeness,
+        "relevance": eval_result.relevance,
+        "feedback": eval_result.feedback,
+        "generated_answer": generated_answer,
+        "latency_seconds": round(latency, 2),
+        "rag_error": None, "judge_error": None,
+    }
 
 
 def _load_eval_questions(questions_dir: Path, config: dict):
@@ -217,10 +237,10 @@ def main() -> None:
 
     # Build base RAG config
     retrieval_cfg = config.get("retrieval", {})
+    judge_model = config.get("judge_model", "groq/openai/gpt-oss-20b")
     base_config = {
         "retrieval": retrieval_cfg,
         "embedding_model": config.get("embedding_model", "text-embedding-3-large"),
-        "model": config.get("model", "groq/openai/gpt-oss-20b"),
     }
 
     workers = config.get("workers", 1)
@@ -230,11 +250,17 @@ def main() -> None:
 
     for exp in tqdm(experiments, desc="Experiments"):
         name = exp.get("name", "unnamed")
+        exp_model = exp.get("model")
+        if not exp_model:
+            raise ValueError(f"Experiment '{name}' is missing required 'model' field")
         exp_config = {
             **base_config,
+            "model": exp_model,
+            "judge_model": judge_model,
             "use_query_rewriting": exp.get("use_query_rewriting", False),
             "use_reranking": exp.get("use_reranking", False),
         }
+        print(f"\n[{name}] model={exp_model}, judge={judge_model}")
         all_results[name] = []
         process_qa = partial(_process_qa, exp_config=exp_config)
         with Pool(
@@ -263,20 +289,34 @@ def main() -> None:
     # Build summary
     summary_rows = []
     for name, records in all_results.items():
+        total = len(records)
         acc = [r["accuracy"] for r in records if r.get("accuracy") is not None]
         comp = [r["completeness"] for r in records if r.get("completeness") is not None]
         rel = [r["relevance"] for r in records if r.get("relevance") is not None]
+        lat = [r["latency_seconds"] for r in records if r.get("latency_seconds") is not None]
+        rag_errors = sum(1 for r in records if r.get("rag_error"))
+        judge_errors = sum(1 for r in records if r.get("judge_error"))
         mean_acc = float(np.mean(acc)) if acc else 0.0
         mean_comp = float(np.mean(comp)) if comp else 0.0
         mean_rel = float(np.mean(rel)) if rel else 0.0
         overall = (mean_acc + mean_comp + mean_rel) / 3.0
+        mean_lat = float(np.mean(lat)) if lat else 0.0
+        p50_lat = float(np.median(lat)) if lat else 0.0
+        p95_lat = float(np.percentile(lat, 95)) if lat else 0.0
         summary_rows.append(
             {
                 "experiment": name,
+                "total_questions": total,
+                "rag_failures": rag_errors,
+                "judge_failures": judge_errors,
+                "success_rate": round((total - rag_errors - judge_errors) / total, 2) if total else 0.0,
                 "mean_accuracy": mean_acc,
                 "mean_completeness": mean_comp,
                 "mean_relevance": mean_rel,
                 "overall_score": overall,
+                "mean_latency_s": mean_lat,
+                "p50_latency_s": p50_lat,
+                "p95_latency_s": p95_lat,
             }
         )
     df_summary = pd.DataFrame(summary_rows)
@@ -301,6 +341,9 @@ def main() -> None:
     print(f"\nBest configuration: {best_row['experiment']}")
     print(
         f"  Mean accuracy: {best_row['mean_accuracy']:.2f} | completeness: {best_row['mean_completeness']:.2f} | relevance: {best_row['mean_relevance']:.2f}"
+    )
+    print(
+        f"  Latency — mean: {best_row['mean_latency_s']:.1f}s | p50: {best_row['p50_latency_s']:.1f}s | p95: {best_row['p95_latency_s']:.1f}s"
     )
 
     # Plots

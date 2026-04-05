@@ -274,3 +274,102 @@ def save_plots(
     plt.tight_layout()
     fig.savefig(output_dir / "distribution_ecdf.png", dpi=150, bbox_inches="tight")
     plt.close()
+
+    # 7. Latency bar chart (mean, p50, p95 per experiment)
+    latency_rows = []
+    for exp_name, records in all_results.items():
+        lats = [r["latency_seconds"] for r in records if r.get("latency_seconds") is not None]
+        if lats:
+            latency_rows.append({"experiment": exp_name, "Stat": "Mean", "Latency (s)": float(np.mean(lats))})
+            latency_rows.append({"experiment": exp_name, "Stat": "p50", "Latency (s)": float(np.median(lats))})
+            latency_rows.append({"experiment": exp_name, "Stat": "p95", "Latency (s)": float(np.percentile(lats, 95))})
+    if latency_rows:
+        df_lat = pd.DataFrame(latency_rows)
+        sns.set_theme(style="whitegrid", font_scale=1.1)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        sns.barplot(
+            data=df_lat,
+            x="experiment",
+            y="Latency (s)",
+            hue="Stat",
+            palette={"Mean": "#e74c3c", "p50": "#f39c12", "p95": "#c0392b"},
+            ax=ax,
+        )
+        for container in ax.containers:
+            for c in container:
+                h = c.get_height()
+                if not np.isnan(h) and h > 0:
+                    ax.annotate(
+                        f"{h:.1f}s",
+                        xy=(c.get_x() + c.get_width() / 2, h / 2),
+                        ha="center", va="center", fontsize=8, fontweight="bold", color="white",
+                    )
+        ax.set_title("RAG latency by experiment (end-to-end, excl. judge)", fontsize=13, fontweight="bold")
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=20, ha="right")
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True)
+        plt.tight_layout()
+        fig.savefig(output_dir / "latency_summary.png", dpi=150, bbox_inches="tight")
+        plt.close()
+
+    # 8. Failure rates by experiment (RAG errors vs judge/structured output errors)
+    failure_rows = []
+    for exp_name, records in all_results.items():
+        total = len(records)
+        rag_err = sum(1 for r in records if r.get("rag_error"))
+        judge_err = sum(1 for r in records if r.get("judge_error"))
+        if total > 0:
+            failure_rows.append({"experiment": exp_name, "Failure Type": "RAG error", "Rate (%)": round(rag_err / total * 100, 1)})
+            failure_rows.append({"experiment": exp_name, "Failure Type": "Judge / structured output error", "Rate (%)": round(judge_err / total * 100, 1)})
+    if failure_rows:
+        df_fail = pd.DataFrame(failure_rows)
+        sns.set_theme(style="whitegrid", font_scale=1.1)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        sns.barplot(
+            data=df_fail,
+            x="experiment",
+            y="Rate (%)",
+            hue="Failure Type",
+            palette={"RAG error": "#e74c3c", "Judge / structured output error": "#f39c12"},
+            ax=ax,
+        )
+        for container in ax.containers:
+            for c in container:
+                h = c.get_height()
+                if not np.isnan(h) and h > 0:
+                    ax.annotate(
+                        f"{h:.1f}%",
+                        xy=(c.get_x() + c.get_width() / 2, h / 2),
+                        ha="center", va="center", fontsize=8, fontweight="bold", color="white",
+                    )
+        ax.set_title("Failure rates by experiment", fontsize=13, fontweight="bold")
+        ax.set_ylabel("Failure Rate (%)")
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=20, ha="right")
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True)
+        plt.tight_layout()
+        fig.savefig(output_dir / "failure_rates.png", dpi=150, bbox_inches="tight")
+        plt.close()
+
+    # 9. Latency box plot (distribution per experiment)
+    lat_dist_rows = []
+    for exp_name, records in all_results.items():
+        for r in records:
+            lat = r.get("latency_seconds")
+            if lat is not None:
+                lat_dist_rows.append({"experiment": exp_name, "Latency (s)": lat})
+    if lat_dist_rows:
+        df_lat_dist = pd.DataFrame(lat_dist_rows)
+        sns.set_theme(style="whitegrid", font_scale=1.1)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        sns.boxplot(
+            data=df_lat_dist,
+            x="experiment",
+            y="Latency (s)",
+            color="#e74c3c",
+            fliersize=3,
+            ax=ax,
+        )
+        ax.set_title("RAG latency distribution by experiment", fontsize=13, fontweight="bold")
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=20, ha="right")
+        plt.tight_layout()
+        fig.savefig(output_dir / "latency_distribution.png", dpi=150, bbox_inches="tight")
+        plt.close()

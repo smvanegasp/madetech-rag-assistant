@@ -26,26 +26,73 @@ retrieval:
   retrieval_k: 20   # Chunks to retrieve per query (original + rewritten)
   final_k: 10      # Chunks to pass to LLM after reranking
 
-# LLM for RAG (query rewriting, reranking, answer generation) and for judge
-model: "groq/openai/gpt-oss-20b"
+# LLM for the judge evaluation (scores accuracy, completeness, relevance)
+judge_model: "groq/llama-3.3-70b-versatile"
 
-# Experiment variants: each runs with different use_query_rewriting / use_reranking
+# Experiment variants: each declares model, use_query_rewriting, and use_reranking
 experiments:
-  # - name: "basic_rag"
-  #   use_query_rewriting: false
-  #   use_reranking: false
+  # --- groq/openai/gpt-oss-20b ---
+  - name: "gpt_oss_20b__basic"
+    model: "groq/openai/gpt-oss-20b"
+    use_query_rewriting: false
+    use_reranking: false
 
-  # - name: "with_reranking"
+  # - name: "gpt_oss_20b__reranking"
+  #   model: "groq/openai/gpt-oss-20b"
   #   use_query_rewriting: false
   #   use_reranking: true
 
-  # - name: "with_rewriting"
+  # - name: "gpt_oss_20b__rewriting"
+  #   model: "groq/openai/gpt-oss-20b"
   #   use_query_rewriting: true
   #   use_reranking: false
 
-  - name: "with_rewriting_and_reranking"
-    use_query_rewriting: true
-    use_reranking: true
+  # - name: "gpt_oss_20b__rewriting_reranking"
+  #   model: "groq/openai/gpt-oss-20b"
+  #   use_query_rewriting: true
+  #   use_reranking: true
+
+  # --- openai/gpt-4o-mini ---
+  # - name: "gpt4o_mini__basic"
+  #   model: "openai/gpt-4o-mini"
+  #   use_query_rewriting: false
+  #   use_reranking: false
+
+  # - name: "gpt4o_mini__reranking"
+  #   model: "openai/gpt-4o-mini"
+  #   use_query_rewriting: false
+  #   use_reranking: true
+
+  # - name: "gpt4o_mini__rewriting"
+  #   model: "openai/gpt-4o-mini"
+  #   use_query_rewriting: true
+  #   use_reranking: false
+
+  # - name: "gpt4o_mini__rewriting_reranking"
+  #   model: "openai/gpt-4o-mini"
+  #   use_query_rewriting: true
+  #   use_reranking: true
+
+  # --- groq/llama-3.1-8b-instant (fast, free, small baseline) ---
+  # - name: "llama_8b__basic"
+  #   model: "groq/llama-3.1-8b-instant"
+  #   use_query_rewriting: false
+  #   use_reranking: false
+
+  # - name: "llama_8b__reranking"
+  #   model: "groq/llama-3.1-8b-instant"
+  #   use_query_rewriting: false
+  #   use_reranking: true
+
+  # - name: "llama_8b__rewriting"
+  #   model: "groq/llama-3.1-8b-instant"
+  #   use_query_rewriting: true
+  #   use_reranking: false
+
+  # - name: "llama_8b__rewriting_reranking"
+  #   model: "groq/llama-3.1-8b-instant"
+  #   use_query_rewriting: true
+  #   use_reranking: true
 
 # Parallel workers for question evaluation (1 = sequential)
 workers: 3
