@@ -61,14 +61,31 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const isDark = theme === 'dark';
   const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
 
-  const MAX_TEXTAREA_HEIGHT = 128;
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  const lineMetrics = useRef<{ oneLine: number; maxHeight: number }>({ oneLine: 0, maxHeight: 0 });
 
+  // Cache line metrics once on mount
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px';
+    const computed = getComputedStyle(el);
+    const lineHeight = parseFloat(computed.lineHeight) || 24;
+    const paddingTop = parseFloat(computed.paddingTop) || 0;
+    const paddingBottom = parseFloat(computed.paddingBottom) || 0;
+    lineMetrics.current = {
+      oneLine: lineHeight + paddingTop + paddingBottom,
+      maxHeight: lineHeight * 3 + paddingTop + paddingBottom,
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    const m = lineMetrics.current;
+    if (!el || !m.oneLine) return;
+    // Force shrink to 1 line so scrollHeight reflects true content
+    el.style.height = m.oneLine + 'px';
+    const desired = Math.min(el.scrollHeight, m.maxHeight);
+    el.style.height = desired + 'px';
   }, [inputValue]);
 
   /**
@@ -261,7 +278,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Input Area */}
       <div className={`p-4 sm:p-6 border-t ${isDark ? 'border-zinc-800 bg-zinc-950/50' : 'border-zinc-100 bg-white/50'} backdrop-blur-md`}>
-        <div className={`max-w-3xl mx-auto flex flex-col rounded-2xl border overflow-hidden transition-all
+        <div className={`max-w-3xl mx-auto flex items-end gap-2 rounded-2xl border px-4 py-2 transition-all
           ${isDark
             ? 'border-zinc-800 bg-zinc-950 focus-within:border-zinc-700'
             : 'border-zinc-200 bg-white shadow-sm focus-within:border-emerald-500 focus-within:shadow-emerald-500/10'}`}>
@@ -273,22 +290,19 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             placeholder="Search handbook documents..."
             enterKeyHint={isTouchDevice ? 'enter' : 'send'}
             rows={1}
-            className={`w-full bg-transparent pl-4 pr-4 pt-3.5 pb-1 text-sm outline-none resize-none overflow-y-auto
+            className={`flex-1 bg-transparent py-2 text-base sm:text-sm outline-none resize-none overflow-y-auto overscroll-contain leading-6
               ${isDark ? 'text-zinc-200 placeholder:text-zinc-600' : 'text-zinc-900 placeholder:text-zinc-400'}`}
-            style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT}px` }}
           />
-          <div className="flex justify-end px-2 pb-2">
-            <button
-              onClick={onSend}
-              disabled={!inputValue.trim() || isLoading}
-              className={`p-2 rounded-xl transition-all
-                ${!inputValue.trim() || isLoading
-                  ? 'opacity-30 cursor-not-allowed'
-                  : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 active:scale-95'}`}
-            >
-              {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-            </button>
-          </div>
+          <button
+            onClick={onSend}
+            disabled={!inputValue.trim() || isLoading}
+            className={`shrink-0 mb-0.5 p-2 rounded-xl transition-all
+              ${!inputValue.trim() || isLoading
+                ? `cursor-not-allowed ${isDark ? 'text-zinc-600' : 'text-zinc-300'}`
+                : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 active:scale-95'}`}
+          >
+            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          </button>
         </div>
         <p className={`mt-2 text-center text-[10px] ${isDark ? 'text-zinc-600' : 'text-zinc-400'}`}>
           AI results may be subject to human error. Please verify critical policy details in original documents.{' '}

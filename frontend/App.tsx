@@ -233,7 +233,7 @@ const App: React.FC = () => {
   const isDark = theme === 'dark';
 
   return (
-    <div className={`flex h-screen w-full overflow-hidden transition-all duration-300 ${isDark ? 'bg-zinc-950 text-zinc-200' : 'bg-white text-zinc-900'}`}>
+    <div className={`flex h-dvh w-full overflow-hidden transition-all duration-300 ${isDark ? 'bg-zinc-950 text-zinc-200' : 'bg-white text-zinc-900'}`}>
       <Sidebar 
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
@@ -268,7 +268,7 @@ const App: React.FC = () => {
             </div>
           </div>
           {/* Feedback button — header on mobile, hidden on desktop (floating button used instead) */}
-          <div className="flex items-center sm:hidden">
+          <div className="flex items-center xl:hidden">
             <button
               onClick={() => setShowContact(true)}
               aria-label="Feedback & Contact"
@@ -322,7 +322,7 @@ const App: React.FC = () => {
       <button
         onClick={() => setShowContact(true)}
         aria-label="Feedback & Contact"
-        className="hidden sm:flex fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95
+        className="hidden xl:flex fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95
           text-white shadow-lg hover:shadow-emerald-500/30 hover:shadow-xl transition-all duration-200 items-center justify-center"
       >
         <MessageCircleHeart size={20} />
