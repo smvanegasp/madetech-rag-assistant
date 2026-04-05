@@ -47,17 +47,11 @@
 
 ---
 
-## Phase 2 — UX Enhancements & New Backend Tools
+## Phase 2 — Frontend UX & RAG Investigation
 
-*Goal: Add new user-facing features and backend tools that improve the chat experience. Test each tool independently before moving to Phase 3 orchestration.*
+*Goal: Ship user-facing improvements and gather insights that will inform the SDK migration in Phase 3. These are independent of the backend architecture.*
 
-### 2.1 In-Chat Feedback & Contact Tools (Backend)
-
-- **[CLAUDE-CODE]** Create a "send feedback" tool: Build a new tool that the LLM can call when the user wants to give feedback. It should collect the message and log it (via Supabase or Resend email). Wire it into the existing `contact_service.py`.
-- **[CLAUDE-CODE]** Create a "get in touch" tool: Similar to above but for contact requests — the LLM detects intent, collects details, and triggers an email or logs the request.
-- **[CLAUDE-CODE]** Add input guardrails: Implement validation so the assistant only answers questions in English that are related to MadeTech or the application. Reject or politely redirect off-topic or non-English queries.
-
-### 2.2 Frontend UX Improvements
+### 2.1 Frontend UX Improvements
 
 - **[COLLAB]** Evaluate and adjust welcome popup timing: Currently the popup closes after ~45 seconds. Get feedback on whether that's enough time. Make the duration configurable. Ensure the popup clearly states the problem being solved. *(You write the copy; Claude Code adjusts the component.)*
 - **[COLLAB]** Add article/resource links in the UI: Display links to related blog posts, the repo, and the one-pager somewhere accessible (sidebar, popup, or footer). *(You provide the URLs; Claude Code builds the UI.)*
@@ -65,7 +59,7 @@
 - **[CLAUDE-CODE]** Add a Frequently Asked Questions section: Add an FAQ panel or expandable section that shows common questions users might ask, helping them understand the app's capabilities.
 - **[COLLAB]** Optional popup tutorial / onboarding GIFs: Create a short walkthrough (2–4 steps) that users can scroll through to understand the features. *(You create/record the GIFs; Claude Code builds the carousel component.)*
 
-### 2.3 Backend — RAG & Latency
+### 2.2 Backend — RAG & Latency
 
 - **[COLLAB]** Investigate double query rewriting: Check if the orchestrator LLM already rewrites the user query when calling the RAG tool, making the explicit `query_rewriting.py` step redundant. Log both the tool-call input and the rewritten query to compare. *(Claude Code can add logging; you analyze the results.)*
 - **[COLLAB]** Test latency with alternative models: Benchmark response time and error rates with different LLMs (e.g., smaller Groq models, other providers via LiteLLM). Document results. *(Claude Code can build a benchmarking script; you run and evaluate.)*
@@ -73,16 +67,24 @@
 
 ---
 
-## Phase 3 — Architecture & Agent Orchestration
+## Phase 3 — SDK Migration & Agent Architecture
 
-*Goal: Migrate to a proper agent framework, enable multi-step reasoning, and add advanced RAG capabilities. This is the most complex phase — Phase 1 and 2 should be stable before starting.*
+*Goal: Migrate to a proper agent framework first, then build new tools on top of it. This avoids building tools twice — once in the current manual approach and again after migration.*
 
 ### 3.1 SDK Migration
 
 - **[COLLAB]** Evaluate and migrate to OpenAI Agents SDK: Refactor the backend to use the OpenAI Agents SDK (or similar) for structured agent orchestration. This replaces the current manual tool-calling approach and gives better tool configuration, structured outputs, and multi-agent support. *(Major architectural decision — you plan the migration; Claude Code executes the refactor.)*
 - **[CLAUDE-CODE]** Improve structured outputs with Pydantic: Once on the new SDK, define strict Pydantic models for all tool inputs/outputs to get reliable structured responses from the LLM.
 
-### 3.2 Multi-Tool Orchestration
+### 3.2 New Backend Tools (post-migration)
+
+*These were originally Phase 2.1. Moved here so they are built on the new SDK rather than the manual tool-calling approach.*
+
+- **[CLAUDE-CODE]** Create a "send feedback" tool: Build a new tool that the LLM can call when the user wants to give feedback. It should collect the message and log it (via Supabase or Resend email). Wire it into the existing `contact_service.py`.
+- **[CLAUDE-CODE]** Create a "get in touch" tool: Similar to above but for contact requests — the LLM detects intent, collects details, and triggers an email or logs the request.
+- **[CLAUDE-CODE]** Add input guardrails: Implement validation so the assistant only answers questions in English that are related to MadeTech or the application. Reject or politely redirect off-topic or non-English queries.
+
+### 3.3 Multi-Tool Orchestration
 
 - **[CLAUDE-CODE]** Create a planning/execution tool: Build a tool that lets the orchestrator LLM plan multi-step queries. Example: *"Compare Lead Engineer vs Software Engineer"* → Plan: (1) RAG query for Lead Engineer, (2) RAG query for Software Engineer, (3) Compare and respond.
 - **[CLAUDE-CODE]** Support multiple RAG tool calls: Enable the agent to make multiple independent RAG queries in a single user interaction (needed for comparison questions, multi-topic queries).
@@ -92,14 +94,14 @@
   - Unrelated / off-topic questions
   - Accidental typing / gibberish
   - General-purpose questions (answerable from system prompt)
-  - Feedback or contact requests (route to tools from Phase 2)
+  - Feedback or contact requests (route to tools from 3.2)
 - **[COLLAB]** Experiment with tool configurations: Add/remove tools from the tool list and test behavior. Investigate whether the system prompt needs to explicitly describe available tools or if SDK-provided tool descriptions are sufficient.
 
-### 3.3 Advanced Search
+### 3.4 Advanced Search
 
 - **[COLLAB]** Add a web/SEO search tool: Create a tool that combines RAG results with live web search for more comprehensive answers. *(Decide on search provider — e.g., Serper, Tavily, Brave; Claude Code integrates it.)*
 
-### 3.4 Tool-Calling Transparency (Frontend)
+### 3.5 Tool-Calling Transparency (Frontend)
 
 - **[CLAUDE-CODE]** Show the tool-calling pattern to the user: Display a collapsible "thinking" or "steps" section in the UI that shows which tools the LLM called and in what order (e.g., *"Searching handbook for Lead Engineer… Searching handbook for Software Engineer… Comparing results…"*). Requires the backend to stream or return tool-call metadata.
 
@@ -135,8 +137,8 @@
 | Phase | Focus                                         | Effort     | Items    |
 | ----- | --------------------------------------------- | ---------- | -------- |
 | **1** | Bug fixes, quick wins, system prompt          | Low–Medium | 14 items |
-| **2** | New tools, UX polish, RAG investigation       | Medium     | 11 items |
-| **3** | SDK migration, multi-agent, advanced features | High       | 8 items  |
+| **2** | Frontend UX, RAG investigation                | Medium     | 8 items  |
+| **3** | SDK migration, new tools, multi-agent         | High       | 11 items |
 | **4** | Content, docs, DevOps                         | Varies     | 8 items  |
 
 
