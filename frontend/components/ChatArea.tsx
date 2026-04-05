@@ -203,16 +203,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="max-w-3xl mx-auto w-full">
           {/* Welcome Screen: Displays common questions if no messages exist */}
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-8 animate-in fade-in duration-1000 py-12">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm border transition-colors
-                ${isDark ? 'bg-zinc-800 border-zinc-700 text-emerald-500' : 'bg-emerald-500 border-emerald-400 text-white'}`}>
-                <BookOpen size={24} />
-              </div>
-
-              <div className="space-y-2">
+            <div className="flex flex-col items-center text-center space-y-8 animate-in fade-in duration-1000 py-12">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm border transition-colors shrink-0
+                  ${isDark ? 'bg-zinc-800 border-zinc-700 text-emerald-500' : 'bg-emerald-500 border-emerald-400 text-white'}`}>
+                  <BookOpen size={20} />
+                </div>
                 <h1 className={`text-2xl font-semibold tracking-tight ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
                   Knowledge Search
                 </h1>
+              </div>
+
+              <div className="space-y-2">
                 <p className={`${isDark ? 'text-zinc-400' : 'text-zinc-500'} text-sm max-w-sm mx-auto`}>
                   Ask anything about company policies, benefits, or workspace guidelines.
                 </p>

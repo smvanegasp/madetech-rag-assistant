@@ -12,13 +12,18 @@
 
 *Goal: Fix bugs, polish existing UX, and make small high-impact changes. These are low-risk, independent items that can be shipped and tested quickly.*
 
-### 1.1 Frontend Bug Fixes
+### 1.1 Frontend Bug Fixes — COMPLETED
 
-- **[CLAUDE-CODE]** Fix iPhone text box zoom bug (AWS only): On iPhone via AWS App Runner, tapping the input field causes an unwanted zoom. Likely a missing `<meta name="viewport">` tag or `font-size < 16px` on the input. Fix in `index.html` and input CSS.
-- **[CLAUDE-CODE]** Fix iPhone text box growing too tall: The input textarea expands excessively on iPhone and takes up too much screen space. Add a `max-height` with overflow scroll.
-- **[CLAUDE-CODE]** Fix iPad feedback button overlapping the message input: The feedback button is positioned on top of the text input on iPad. Adjust layout/positioning for tablet breakpoints.
-- **[CLAUDE-CODE]** Fix AWS App Runner layout allowing minimal scroll: On HuggingFace the layout fills the page correctly, but on AWS there is unwanted scrolling. Likely a `height: 100vh` vs `100dvh` issue or body overflow setting. Compare both deployments.
-- **[COLLAB]** Verify tablet experience end-to-end: After the above fixes, test on iPad/tablet simulators. *(Claude Code can set up responsive CSS; manual QA needed.)*
+- ~~**[CLAUDE-CODE]** Fix iPhone text box zoom bug (AWS only)~~ — Done: added `maximum-scale=1.0` to viewport meta + `text-base` (16px) on mobile input.
+- ~~**[CLAUDE-CODE]** Fix iPhone text box growing too tall~~ — Done: textarea capped at 3 lines using cached line metrics, stable across all devices.
+- ~~**[CLAUDE-CODE]** Fix iPad feedback button overlapping the message input~~ — Done: header button shown on all touch/tablet devices (`xl:hidden`), floating button desktop-only (`xl:flex`).
+- ~~**[CLAUDE-CODE]** Fix AWS App Runner layout allowing minimal scroll~~ — Done: root uses `h-dvh`, html/body set to `overflow: hidden; height: 100dvh`.
+- ~~**[COLLAB]** Verify tablet experience end-to-end~~ — Done: manually verified on iPhone and iPad.
+
+**Additional improvements made during this session:**
+- Textarea auto-grows naturally like WhatsApp (no letter clipping mid-line), with `overscroll-behavior: contain` to prevent scroll chaining on touch devices.
+- Send button repositioned inline next to textarea (was in its own row below) for a cleaner, more space-efficient input bar.
+- Welcome screen book icon moved inline next to "Knowledge Search" title to avoid clipping on short viewports (e.g., Chrome on iPhone).
 
 ### 1.2 Frontend Quick Enhancements
 
