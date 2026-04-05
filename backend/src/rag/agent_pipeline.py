@@ -11,6 +11,7 @@ Run from repo root:
     uvicorn backend.src.app:app --reload --port 9481
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -63,7 +64,7 @@ def search_handbook(ctx: RunContextWrapper[RAGContext], query: str) -> str:
         ctx.context.openai_client,
         ctx.context.config,
     )
-    ctx.context.retrieved_chunks = chunks
+    ctx.context.retrieved_chunks.extend(chunks)
     context_str = _format_context(chunks)
     return f"{RAG_ANSWERING_INSTRUCTIONS}\n\n{context_str}"
 
@@ -123,6 +124,30 @@ def get_in_touch(ctx: RunContextWrapper[RAGContext], name: str, email: str, mess
         return f"Failed to send contact request: {e}. Apologize and suggest they try again later."
 
 
+def _extract_tool_steps(result) -> list[dict]:
+    """Extract tool call metadata from the agent RunResult."""
+    from agents.items import ToolCallItem
+
+    steps = []
+    order = 1
+    for item in result.new_items:
+        if isinstance(item, ToolCallItem):
+            raw = item.raw_item
+            tool_name = getattr(raw, "name", "unknown")
+            arguments_str = getattr(raw, "arguments", "{}")
+            try:
+                arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
+            except (json.JSONDecodeError, TypeError):
+                arguments = {}
+            steps.append({
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "order": order,
+            })
+            order += 1
+    return steps
+
+
 def _build_agent(config: dict) -> Agent[RAGContext]:
     """Create the Nexus agent with the search tool."""
     model_name = config.get("model", "groq/openai/gpt-oss-20b")
@@ -147,7 +172,7 @@ def answer_question_agent(
     collection=None,
     openai_client: OpenAI | None = None,
     config: dict | None = None,
-) -> tuple[str, list[Result]]:
+) -> tuple[str, list[Result], list[dict]]:
     """
     Run the agent-based RAG pipeline and return (answer, chunks).
 
@@ -198,7 +223,8 @@ def answer_question_agent(
         agent,
         input=input_messages,
         context=rag_context,
-        max_turns=3,
+        max_turns=6,
     )
 
-    return result.final_output, rag_context.retrieved_chunks
+    tool_steps = _extract_tool_steps(result)
+    return result.final_output, rag_context.retrieved_chunks, tool_steps

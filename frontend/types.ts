@@ -16,11 +16,18 @@ export interface SourceChunk {
   snippet: string;
 }
 
+export interface ToolStep {
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  order: number;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   sources?: SourceChunk[];
+  toolSteps?: ToolStep[];
   timestamp: Date;
   isError?: boolean;
 }

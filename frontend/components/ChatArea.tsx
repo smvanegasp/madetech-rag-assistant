@@ -17,9 +17,9 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle } from 'lucide-react';
+import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle, Search } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
-import { Message, SourceChunk, Theme, HandbookDoc } from '../types';
+import { Message, SourceChunk, ToolStep, Theme, HandbookDoc } from '../types';
 
 /**
  * Props for ChatArea component
@@ -138,6 +138,40 @@ const ChatArea: React.FC<ChatAreaProps> = ({
    * @param message - The assistant message with sources to render
    * @returns React element with citation badges, or null if no sources
    */
+  const formatToolStep = (step: ToolStep): string => {
+    if (step.tool_name === 'search_handbook') {
+      const query = step.arguments?.query as string | undefined;
+      return query ? `Searched handbook for "${query}"` : 'Searched handbook';
+    }
+    if (step.tool_name === 'send_feedback') return 'Sent feedback';
+    if (step.tool_name === 'get_in_touch') return 'Sent contact request';
+    return `Ran ${step.tool_name.replace(/_/g, ' ')}`;
+  };
+
+  const renderToolSteps = useCallback((message: Message) => {
+    if (!message.toolSteps || message.toolSteps.length === 0) return null;
+
+    return (
+      <div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${
+        isDark
+          ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
+          : 'border-zinc-100 bg-zinc-50 text-zinc-400'
+      }`}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Search size={11} />
+          <span className="font-medium">Steps</span>
+        </div>
+        <ol className="space-y-0.5 pl-4 list-decimal">
+          {message.toolSteps
+            .sort((a, b) => a.order - b.order)
+            .map((step, i) => (
+              <li key={i}>{formatToolStep(step)}</li>
+            ))}
+        </ol>
+      </div>
+    );
+  }, [isDark]);
+
   /**
    * Renders a "Sources:" section below assistant messages.
    * Each source is numbered to match inline [n] citation markers.
@@ -303,12 +337,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     : `w-full min-w-0 ${isDark ? 'text-zinc-300' : 'text-zinc-800'}`}`}
                 >
                   {message.role === 'assistant' ? (
+                    <>
+                    {renderToolSteps(message)}
                     <MarkdownRenderer
                       content={message.content}
                       theme={theme}
                       sources={message.sources}
                       onCiteClick={message.sources ? (docId) => onOpenSource(message.sources!, docId, message.id) : undefined}
                     />
+                    </>
                   ) : (
                     <p>{message.content}</p>
                   )}

@@ -206,6 +206,7 @@ Use the search tool when:
 - The question sounds like it could be answered by a handbook page or index page, even if the user does not explicitly mention the handbook
 - The question requires specific Made Tech knowledge not already present in the conversation
 - You are unsure whether the answer is fully covered by the conversation history alone
+- If the question involves comparing, contrasting, or asking about multiple distinct topics (e.g., "Compare Lead Engineer vs Software Engineer"), make a separate search for each topic to ensure comprehensive coverage. You can call the search tool multiple times in one interaction.
 
 Do NOT use the search tool when:
 - The user is greeting you or making casual conversation (for example "Hi", "Hello", or "My name is Jake")

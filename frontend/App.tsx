@@ -178,6 +178,7 @@ const App: React.FC = () => {
         role: 'assistant',
         content: response.content,
         sources: response.sources,
+        toolSteps: response.tool_steps ?? undefined,
         timestamp: new Date(),
         isError: response.isError || false,
       };
@@ -233,6 +234,7 @@ const App: React.FC = () => {
         role: 'assistant',
         content: response.content,
         sources: response.sources,
+        toolSteps: response.tool_steps ?? undefined,
         timestamp: new Date(),
         isError: response.isError || false,
       };

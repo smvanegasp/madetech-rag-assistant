@@ -9,10 +9,10 @@ vector_db:
 # Embeddings (must match the model used when creating the vector DB)
 embedding_model: "text-embedding-3-large"
 
-# Retrieval parameters (from winning experiment: with_rewriting_and_reranking)
+# Retrieval parameters
 retrieval:
-  retrieval_k: 20   # Chunks to retrieve per query (original + rewritten)
-  final_k: 10      # Chunks to pass to LLM after reranking
+  retrieval_k: 10   # Chunks to retrieve per query
+  final_k: 10       # Chunks to pass to LLM (same as retrieval_k when not reranking)
 
 # LLM for query rewriting, reranking, and answer generation
 model: "groq/openai/gpt-oss-20b"

@@ -83,15 +83,17 @@ class RAGService:
         )
 
     def _extract_sources(
-        self, chunks: List[Any], max_sources: int = 10
+        self, chunks: List[Any], max_sources: int = 15
     ) -> List[SourceChunk]:
         """
         Convert retrieval Result objects to SourceChunk for the API response.
 
-        Extracts doc_id from metadata (tries doc_id, id, source_file) and
-        truncates long snippets at sentence boundaries when > 800 chars.
+        Deduplicates by (doc_id, snippet) to avoid returning the same chunk
+        multiple times when accumulated across multiple tool calls. Truncates
+        long snippets at sentence boundaries when > 800 chars.
         """
         sources = []
+        seen = set()
         for chunk in chunks:
             meta = (
                 chunk.metadata
@@ -115,6 +117,11 @@ class RAGService:
                     snippet = snippet[: truncate_at + 1]
                 else:
                     snippet = snippet[:800] + "..."
+            # Deduplicate by content hash
+            key = (doc_id, snippet[:200])
+            if key in seen:
+                continue
+            seen.add(key)
             sources.append(SourceChunk(docId=doc_id, snippet=snippet))
             if len(sources) >= max_sources:
                 break
@@ -144,7 +151,7 @@ class RAGService:
                 "use_query_rewriting": self.config.get("use_query_rewriting", False),
                 "use_reranking": self.config.get("use_reranking", False),
             }
-            answer, chunks = await asyncio.to_thread(
+            answer, chunks, tool_steps = await asyncio.to_thread(
                 answer_question_agent,
                 query,
                 history=history_msgs,
@@ -153,10 +160,11 @@ class RAGService:
                 config=pipeline_config,
             )
             sources = self._extract_sources(chunks)
-            return {"content": answer, "sources": sources}
+            return {"content": answer, "sources": sources, "tool_steps": tool_steps}
         except Exception as e:
             print(f"RAG service error: {e}")
             return {
                 "content": "I'm having trouble processing your request right now. Please try again in a moment.",
                 "sources": [],
+                "tool_steps": [],
             }

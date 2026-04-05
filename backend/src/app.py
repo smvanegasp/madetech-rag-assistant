@@ -31,6 +31,7 @@ from utils.models import (
     ChatResponse,
     ContactRequest,
     HandbookDoc,
+    ToolStep,
 )
 from .config_loader import load_config
 from .handbook_loader import load_handbook_documents
@@ -204,11 +205,15 @@ async def chat(request: ChatRequest):
             response_time_ms=response_time_ms,
         )
 
+        raw_steps = result.get("tool_steps", [])
+        tool_steps = [ToolStep(**s) for s in raw_steps] if raw_steps else None
+
         return ChatResponse(
             content=result["content"],
             sources=result["sources"],
             chat_id=chat_id,
             interaction_id=interaction_id,
+            tool_steps=tool_steps,
         )
     except Exception as e:
         print(f"Chat endpoint error: {e}")

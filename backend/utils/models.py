@@ -220,6 +220,14 @@ class ChatRequest(BaseModel):
     chat_id: Optional[str] = None
 
 
+class ToolStep(BaseModel):
+    """A single tool invocation during the agent run."""
+
+    tool_name: str
+    arguments: dict = {}
+    order: int
+
+
 class ChatResponse(BaseModel):
     """Response from the chat endpoint."""
 
@@ -227,5 +235,6 @@ class ChatResponse(BaseModel):
     sources: List[SourceChunk]
     chat_id: str
     interaction_id: str
+    tool_steps: Optional[List[ToolStep]] = None
 
 
