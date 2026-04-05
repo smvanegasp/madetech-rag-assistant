@@ -11,6 +11,7 @@ The LLM decides whether to call the handbook search tool (RAG) or answer directl
 """
 
 import json
+from datetime import date
 
 from litellm import completion
 from openai import OpenAI
@@ -122,7 +123,7 @@ def make_rag_messages(
     User messages: conversation history + current question.
     """
     context = _format_context(chunks)
-    system_prompt = RAG_SYSTEM_PROMPT.format(context=context)
+    system_prompt = RAG_SYSTEM_PROMPT.format(context=context, today=date.today().strftime("%B %d, %Y"))
     return (
         [{"role": "system", "content": system_prompt}]
         + history
@@ -197,7 +198,7 @@ def answer_question(
 
     # Phase 1: let the LLM decide whether to search the handbook.
     phase1_messages = (
-        [{"role": "system", "content": TOOL_DECISION_SYSTEM_PROMPT}]
+        [{"role": "system", "content": TOOL_DECISION_SYSTEM_PROMPT.format(today=date.today().strftime("%B %d, %Y"))}]
         + history
         + [{"role": "user", "content": question}]
     )
@@ -221,7 +222,7 @@ def answer_question(
     )
 
     context = _format_context(chunks)
-    system_prompt = RAG_SYSTEM_PROMPT.format(context=context)
+    system_prompt = RAG_SYSTEM_PROMPT.format(context=context, today=date.today().strftime("%B %d, %Y"))
 
     # Reconstruct full message thread: system + history + user + assistant
     # (with tool call) + tool result, then generate the final answer.

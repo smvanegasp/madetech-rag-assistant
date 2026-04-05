@@ -32,18 +32,18 @@
 - ~~**[CLAUDE-CODE]** Update first sample question~~ — Done: changed to "Tell me more about this app".
 - ~~**[CLAUDE-CODE]** Add a "Try again" button on error~~ — Done: API errors show a retry button that re-sends the original user message with the error cleared from history.
 
-### 1.3 System Prompt Improvements (Backend)
+### 1.3 System Prompt Improvements (Backend) — COMPLETED
 
-- **[CLAUDE-CODE]** Inject today's date dynamically: In `backend/utils/prompts.py`, use Python `datetime` + f-strings to include today's date in the system prompt so the LLM is never confused about its temporal context.
-- **[COLLAB]** Add "Tell me about this app" capability: Update the system prompt to include a description of the app — what problem it solves, link to the repo, link to the web app, and relevant articles. *(You write the copy; Claude Code wires it into the prompt.)*
-- **[COLLAB]** Add creator and disclaimer info: Decide what attribution/disclaimer text to include, then add it to the system prompt.
-- **[CLAUDE-CODE]** Add repo link to the system prompt: Include the GitHub repository URL in the system prompt context.
-- **[COLLAB]** Add a handbook summary to the system prompt: Generate a high-level summary of the handbook (sections, roles covered, topics) so the orchestrator LLM can answer general questions without making a RAG query every time. *(You produce the summary from your docs or ask an LLM; Claude Code integrates it.)*
+- ~~**[CLAUDE-CODE]** Inject today's date dynamically~~ — Done: `{today}` placeholder in both `TOOL_DECISION_SYSTEM_PROMPT` and `RAG_SYSTEM_PROMPT`, formatted as "Month DD, YYYY" at runtime in `pipeline.py`.
+- ~~**[COLLAB]** Add "Tell me about this app" capability~~ — Done: project repo link, creator info, and disclaimer already in prompt. Articles pending (see Pending Items).
+- ~~**[COLLAB]** Add creator and disclaimer info~~ — Done: already present in original prompts (Sergio Vanegas, LinkedIn, academic project, disclaimer caveats).
+- ~~**[CLAUDE-CODE]** Add repo link to the system prompt~~ — Done: `https://github.com/smvanegasp/madetech-rag-assistant` added to both prompts.
+- ~~**[COLLAB]** Add a handbook summary to the system prompt~~ — Done: comprehensive summary covering all 150+ documents across 6 categories, including specific topics per area and an explicit list of topics the handbook does NOT cover. Also added the full handbook file index (organized by category and seniority level for roles) so Nexus can answer structural questions like "what roles exist?" or "what benefits are there?" directly from the system prompt without a RAG search.
 
-### 1.4 Operational Quick Wins
+### 1.4 Operational Quick Wins — COMPLETED
 
-- **[MANUAL]** Verify budget constraints on Groq and OpenAI APIs: Check that spending limits / rate limits are configured on both provider dashboards.
-- **[MANUAL]** Monitor cost of serving the app: Set up basic cost tracking (API call counts, token usage). Could be as simple as logging token counts per request to Supabase.
+- ~~**[MANUAL]** Verify budget constraints on Groq and OpenAI APIs~~ — Done: Groq set to $5/month on-demand limit. OpenAI set to $5 pre-loaded credits with auto-recharge disabled.
+- ~~**[MANUAL]** Monitor cost of serving the app~~ — Deferred: with $5/month caps on both providers, the budget limits themselves act as the guardrail. Revisit if caps are raised (see Pending Items).
 
 ---
 
@@ -149,3 +149,10 @@
 3. **Test:** Manually verify on all target platforms (desktop, iPhone, iPad, HuggingFace, AWS).
 4. **Ship:** Deploy and monitor before starting the next phase.
 5. **Repeat.**
+
+---
+
+## Pending Items (Cross-Phase)
+
+- **[MANUAL]** Write articles about the project: Blog posts, write-ups, or case studies to link from the app and system prompt. Once available, add URLs to the system prompt and UI. *(Referenced in Phase 1.3 and Phase 4.1.)*
+- **[COLLAB]** Add cost monitoring: Log token counts per request to Supabase for usage tracking. Not needed while $5/month caps are in place — revisit if budget limits are raised. *(Referenced in Phase 1.4.)*
