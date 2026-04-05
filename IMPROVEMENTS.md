@@ -51,13 +51,19 @@
 
 *Goal: Ship user-facing improvements and gather insights that will inform the SDK migration in Phase 3. These are independent of the backend architecture.*
 
-### 2.1 Frontend UX Improvements
+### 2.1 Frontend UX Improvements — COMPLETED
 
-- **[COLLAB]** Evaluate and adjust welcome popup timing: Currently the popup closes after ~45 seconds. Get feedback on whether that's enough time. Make the duration configurable. Ensure the popup clearly states the problem being solved. *(You write the copy; Claude Code adjusts the component.)*
-- **[COLLAB]** Add article/resource links in the UI: Display links to related blog posts, the repo, and the one-pager somewhere accessible (sidebar, popup, or footer). *(You provide the URLs; Claude Code builds the UI.)*
-- **[CLAUDE-CODE]** Inline source citations (ChatGPT-style): Instead of showing sources only at the end of an answer, show numbered citation buttons inline within the response text. Clicking one reveals the source. This requires changes to both the backend response format and the frontend rendering.
-- **[CLAUDE-CODE]** Add a Frequently Asked Questions section: Add an FAQ panel or expandable section that shows common questions users might ask, helping them understand the app's capabilities.
-- **[COLLAB]** Optional popup tutorial / onboarding GIFs: Create a short walkthrough (2–4 steps) that users can scroll through to understand the features. *(You create/record the GIFs; Claude Code builds the carousel component.)*
+- ~~**[COLLAB]** Evaluate and adjust welcome popup timing~~ — Done: 45-second auto-dismiss confirmed as appropriate.
+- ~~**[COLLAB]** Add article/resource links in the UI~~ — Deferred: no articles available yet (see Pending Items).
+- ~~**[CLAUDE-CODE]** Inline source citations (ChatGPT-style)~~ — Done: backend numbers chunks for LLM citation, `[n]` markers stripped from displayed text, clean "Sources:" list below each answer with sequential numbering and clickable doc links.
+- ~~**[CLAUDE-CODE]** Add a Frequently Asked Questions section~~ — Done: collapsible "What can I help with?" section on welcome screen with 5 categories (Benefits, Roles, Ways of Working, Policies, Welfare) and a note on handbook limitations.
+- ~~**[COLLAB]** Optional popup tutorial / onboarding GIFs~~ — Deferred: needs GIF content created first (see Pending Items).
+
+**Additional improvements made during this session:**
+- System prompt now uses human-readable names in the handbook file index ("Delivery Manager" not "delivery_manager") with explicit instruction to present names naturally.
+- Nexus told it doesn't know anything about the user (no assumed name, role, or team).
+- "Tell me about this app" now answered directly from system prompt — Nexus knows "this app" refers to itself.
+- Structural questions (what roles exist, what benefits are there) answered from system prompt without triggering a RAG search.
 
 ### 2.2 Backend — RAG & Latency
 
@@ -156,5 +162,6 @@
 
 ## Pending Items (Cross-Phase)
 
-- **[MANUAL]** Write articles about the project: Blog posts, write-ups, or case studies to link from the app and system prompt. Once available, add URLs to the system prompt and UI. *(Referenced in Phase 1.3 and Phase 4.1.)*
+- **[MANUAL]** Write articles about the project: Blog posts, write-ups, or case studies to link from the app and system prompt. Once available, add URLs to the system prompt and UI. Also needed for article/resource links in the app UI. *(Referenced in Phase 1.3, Phase 2.1, and Phase 4.1.)*
+- **[COLLAB]** Build popup tutorial / onboarding GIFs: Create a short walkthrough (2–4 steps) showing app features, then build a carousel component. *(Referenced in Phase 2.1.)*
 - **[COLLAB]** Add cost monitoring: Log token counts per request to Supabase for usage tracking. Not needed while $5/month caps are in place — revisit if budget limits are raised. *(Referenced in Phase 1.4.)*

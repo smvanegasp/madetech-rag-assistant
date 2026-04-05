@@ -17,7 +17,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw } from 'lucide-react';
+import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Message, SourceChunk, Theme, HandbookDoc } from '../types';
 
@@ -63,6 +63,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDark = theme === 'dark';
   const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
+  const [faqOpen, setFaqOpen] = useState(false);
 
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
   const lineMetrics = useRef<{ oneLine: number; maxHeight: number }>({ oneLine: 0, maxHeight: 0 });
@@ -137,60 +138,64 @@ const ChatArea: React.FC<ChatAreaProps> = ({
    * @param message - The assistant message with sources to render
    * @returns React element with citation badges, or null if no sources
    */
-  const renderCitations = useCallback((message: Message) => {
+  /**
+   * Renders a "Sources:" section below assistant messages.
+   * Each source is numbered to match inline [n] citation markers.
+   * Designed to support multiple source groups per message in the future.
+   */
+  const renderSources = useCallback((message: Message) => {
     if (!message.sources || message.sources.length === 0) return null;
 
-    const distinctDocs: string[] = [];
+    // Build sequentially numbered list of unique docs
+    const entries: { num: number; docId: string; title: string }[] = [];
     const seenDocIds = new Set<string>();
+    let num = 1;
 
-    message.sources.forEach(s => {
+    message.sources.forEach((s) => {
       if (!seenDocIds.has(s.docId)) {
-        distinctDocs.push(s.docId);
         seenDocIds.add(s.docId);
+        const doc = handbookDocs.find(d => d.id === s.docId);
+        entries.push({ num: num++, docId: s.docId, title: doc?.title || s.docId.replace(/_/g, ' ') });
       }
     });
 
-    const cappedDocs = distinctDocs.slice(0, 4);
     const isExpanded = expandedCitations[message.id];
-    const visibleDocIds = isExpanded ? cappedDocs : [cappedDocs[0]];
-    const hasMore = cappedDocs.length > 1;
+    const visibleEntries = isExpanded ? entries : entries.slice(0, 2);
+    const hasMore = entries.length > 2;
 
     return (
-      <div className="flex flex-col mt-6 animate-in fade-in duration-700">
-        <div className="flex flex-wrap gap-2 items-center">
-          {visibleDocIds.map((docId, idx) => {
-            const doc = handbookDocs.find(d => d.id === docId);
-            return doc ? (
-              <button
-                key={`${message.id}-${idx}`}
-                onClick={() => onOpenSource(message.sources!, docId, message.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all border
-                  ${isDark
-                    ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-emerald-500/50 hover:text-zinc-200'
-                    : 'bg-white border-zinc-200 text-zinc-600 hover:border-emerald-500 hover:text-emerald-600'}`}
-              >
-                <FileText size={12} className="text-zinc-400" />
-                <span className="truncate max-w-[150px] font-medium">{doc.title}</span>
-              </button>
-            ) : null;
-          })}
-
-          {hasMore && (
+      <div className={`mt-4 text-xs animate-in fade-in duration-700 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+        <p className={`font-medium mb-1.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Sources:</p>
+        <div className="flex flex-col gap-1">
+          {visibleEntries.map((entry) => (
             <button
-              onClick={() => toggleCitations(message.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
-                ${isDark
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'
-                  : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200'}`}
+              key={`${message.id}-src-${entry.num}`}
+              onClick={() => onOpenSource(message.sources!, entry.docId, message.id)}
+              className={`flex items-center gap-2 text-left transition-colors
+                ${isDark ? 'hover:text-zinc-300' : 'hover:text-zinc-600'}`}
             >
-              {isExpanded ? (
-                <>Show less <ChevronUp size={12} /></>
-              ) : (
-                <>+{cappedDocs.length - 1} more sources <ChevronDown size={12} /></>
-              )}
+              <span className={`shrink-0 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-medium
+                ${isDark ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-200 text-zinc-500'}`}>
+                {entry.num}
+              </span>
+              <FileText size={11} className="shrink-0" />
+              <span className="truncate">{entry.title}</span>
             </button>
-          )}
+          ))}
         </div>
+        {hasMore && (
+          <button
+            onClick={() => toggleCitations(message.id)}
+            className={`mt-1.5 flex items-center gap-1 text-[11px] font-medium transition-colors
+              ${isDark ? 'text-zinc-600 hover:text-zinc-400' : 'text-zinc-400 hover:text-zinc-600'}`}
+          >
+            {isExpanded ? (
+              <>Show less <ChevronUp size={11} /></>
+            ) : (
+              <>+{entries.length - 2} more <ChevronDown size={11} /></>
+            )}
+          </button>
+        )}
       </div>
     );
   }, [expandedCitations, isDark, onOpenSource, handbookDocs]);
@@ -244,6 +249,44 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   </button>
                 ))}
               </div>
+
+              {/* FAQ Section */}
+              <div className="w-full max-w-xl">
+                <button
+                  onClick={() => setFaqOpen(!faqOpen)}
+                  className={`flex items-center gap-2 mx-auto text-xs font-medium transition-colors
+                    ${isDark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-400 hover:text-zinc-600'}`}
+                >
+                  <HelpCircle size={14} />
+                  What can I help with?
+                  {faqOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {faqOpen && (
+                  <div className={`mt-4 text-left text-xs space-y-3 rounded-xl border p-4 animate-in fade-in duration-300
+                    ${isDark ? 'bg-zinc-900/50 border-zinc-800 text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-500'}`}>
+                    {[
+                      { title: 'Benefits & Compensation', examples: ['Pension scheme & employer matching', 'Holiday allowance & booking', 'Cycle to work, tech loans, medical insurance', 'Learning budgets & development'] },
+                      { title: 'Roles & Careers', examples: ['50+ role descriptions across all levels', 'SFIA framework & career progression', 'Responsibilities, competencies & expectations'] },
+                      { title: 'Ways of Working', examples: ['Delivery standards & development practices', 'Onboarding, 1-on-1s, probation, promotions', 'Hybrid working & office policies'] },
+                      { title: 'Policies & Security', examples: ['Password, BYOD & data protection policies', 'Anti-corruption, whistleblowing, EDI', 'Laptop specs, VPN, security clearance'] },
+                      { title: 'Welfare & Leave', examples: ['Sick leave, parental leave, paid counselling', 'Mental health support & raising issues'] },
+                    ].map((cat) => (
+                      <div key={cat.title}>
+                        <p className={`font-semibold text-xs mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{cat.title}</p>
+                        <ul className="space-y-0.5 pl-3">
+                          {cat.examples.map((ex) => (
+                            <li key={ex} className="list-disc">{ex}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                    <p className={`pt-2 border-t text-[10px] ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-zinc-200 text-zinc-400'}`}>
+                      Based on the Made Tech handbook (Jan 2026 snapshot). Cannot answer about specific salaries, client details, or org structure.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -260,7 +303,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     : `w-full min-w-0 ${isDark ? 'text-zinc-300' : 'text-zinc-800'}`}`}
                 >
                   {message.role === 'assistant' ? (
-                    <MarkdownRenderer content={message.content} theme={theme} />
+                    <MarkdownRenderer
+                      content={message.content}
+                      theme={theme}
+                      sources={message.sources}
+                      onCiteClick={message.sources ? (docId) => onOpenSource(message.sources!, docId, message.id) : undefined}
+                    />
                   ) : (
                     <p>{message.content}</p>
                   )}
@@ -277,7 +325,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     Try again
                   </button>
                 )}
-                {message.role === 'assistant' && !message.isError && renderCitations(message)}
+                {message.role === 'assistant' && !message.isError && renderSources(message)}
               </div>
             ))}
 

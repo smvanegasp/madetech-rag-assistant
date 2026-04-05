@@ -104,10 +104,10 @@ def fetch_context(
 
 
 def _format_context(chunks: list[Result]) -> str:
-    """Render retrieved chunks as a single context string for injection into the LLM."""
+    """Render retrieved chunks as a numbered context string for injection into the LLM."""
     return "\n\n---\n\n".join(
-        f"Extract from ({chunk.metadata.get('category', '')}) — {chunk.metadata.get('title', '')}:\n{chunk.page_content}"
-        for chunk in chunks
+        f"[{i}] Extract from ({chunk.metadata.get('category', '')}) — {chunk.metadata.get('title', '')}:\n{chunk.page_content}"
+        for i, chunk in enumerate(chunks, 1)
     )
 
 
