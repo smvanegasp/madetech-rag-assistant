@@ -65,9 +65,14 @@ def _format_context(chunks: list[Result]) -> str:
 
 @function_tool
 def search_handbook(ctx: RunContextWrapper[RAGContext], query: str) -> str:
-    """Search the Made Tech handbook for a single topic.
+    """Search the handbook for a single topic.
     Use this for simple questions that need one search, or as a follow-up
     search after plan_searches if you need additional information.
+    IMPORTANT: Keep the query focused on the topic itself. Do NOT include
+    'Made Tech' or 'handbook' in the query — these are noise words that
+    hurt search quality since every document contains them.
+    Good: 'parental leave policy'
+    Bad: 'Made Tech handbook parental leave policy'
     """
     chunks = fetch_context(
         query,
@@ -89,6 +94,8 @@ def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str
 
     Provide a list of 2-4 distinct search queries. Each query should target
     a different topic — do not include duplicate or overlapping queries.
+    IMPORTANT: Do NOT include 'Made Tech' or 'handbook' in queries — these
+    are noise words. Focus on the topic: 'parental leave', 'Data Engineer role', etc.
 
     After reviewing the results, if you need more information you can still
     call search_handbook for a follow-up search. If the results already
