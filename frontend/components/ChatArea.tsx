@@ -17,7 +17,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle, Search, CheckCircle2, Circle } from 'lucide-react';
+import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle, Search, CheckCircle2, Circle, Sparkles } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Message, SourceChunk, ToolStep, Theme, HandbookDoc } from '../types';
 
@@ -67,6 +67,60 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const isDark = theme === 'dark';
   const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
   const [faqOpen, setFaqOpen] = useState(false);
+
+  const SAMPLE_QUESTIONS = [
+    "Which cities have Made Tech offices?",
+    "How does a Delivery Manager handle timesheets?",
+    "What notice do I need for a 3-day holiday?",
+    "How much does the life insurance pay out?",
+    "How many days of annual leave do I get?",
+    "What happens to my salary if I work fewer days?",
+    "How do I change my pension contribution?",
+    "What is the work ready allowance and how do I claim it?",
+    "How do I see my pay slips?",
+    "What Slack channel must all employees stay in?",
+    "What does a buddy do for a new team member?",
+    "How long does security clearance take?",
+    "When does the annual review take place?",
+    "What in-house learning programmes are available?",
+    "What steps should I follow before an annual review?",
+    "How often should 121 meetings happen?",
+    "What is the referral payment for hiring an apprentice?",
+    "What should I do if my laptop is stolen?",
+    "How do I request extra tools or licenses?",
+    "What should I do if I suspect a social engineering attempt?",
+    "How do I start an open or closed community group?",
+    "What SFIA level is the Lead Content Designer?",
+    "What does a Senior Business Analyst do?",
+    "What are the responsibilities of a Senior Data Scientist?",
+    "Who does the Head of Managed Services report to?",
+    "What are the main responsibilities of a Finance Business Partner?",
+    "How do remote work expectations differ between roles?",
+    "What Docker licence do I need with a Made Tech email?",
+    "What Miro licence do new starters receive?",
+    "How do I prepare for a DevOps pairing session?",
+    "What is the cost of the AWS Cloud Practitioner exam?",
+    "Which AWS regions are allowed in the Playground account?",
+    "When are sandbox resources automatically deleted?",
+    "What should I do with a client laptop before leaving?",
+    "What should I do if frustration starts during mentoring?",
+    "How can a mentee use coding katas in mentorship?",
+    "What core values are highlighted across Made Tech roles?",
+    "What is the salary range for a Designer?",
+    "When is the next ISO 27001 review?",
+    "Where does Made Tech backup my data?",
+    "What KPIs do Delivery Managers track?",
+    "How do I raise a concern about wrongdoing?",
+    "What training must I complete within 30 days of starting?",
+    "How many days a month for hybrid working?",
+    "What is the Anti-Slavery policy scope?",
+    "How do I expense an AWS exam in Xero?",
+    "What prerequisites are needed for Azure certification linking?",
+    "How do I add a new activity to the handbook?",
+    "What are Made Tech's values?",
+    "What is the salary transparency policy?",
+  ];
+  const getRandomQuestion = () => SAMPLE_QUESTIONS[Math.floor(Math.random() * SAMPLE_QUESTIONS.length)];
 
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
   const lineMetrics = useRef<{ oneLine: number; maxHeight: number }>({ oneLine: 0, maxHeight: 0 });
@@ -284,8 +338,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 {[
                   "Tell me more about this app",
                   "Data Engineer vs Software Engineer",
-                  "Tell me about parental leave",
-                  "What benefits do we have?"
+                  "What benefits do we have?",
                 ].map((q) => (
                   <button
                     key={q}
@@ -300,6 +353,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     {q}
                   </button>
                 ))}
+                <button
+                  onClick={() => setInputValue(getRandomQuestion())}
+                  className={`p-4 text-left text-sm rounded-xl border transition-all flex items-center gap-2
+                    ${isDark
+                      ? 'bg-zinc-900/50 border-zinc-800 hover:border-emerald-500/30 text-zinc-400'
+                      : 'bg-white border-zinc-200 hover:border-emerald-500/30 hover:bg-emerald-50/10 text-zinc-600'}`}
+                >
+                  <Sparkles size={14} className="shrink-0 text-emerald-500" />
+                  Surprise me
+                </button>
               </div>
 
               {/* FAQ Section */}
