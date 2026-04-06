@@ -12,15 +12,26 @@ Run from repo root:
 """
 
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from agents import Agent, Runner, function_tool, RunContextWrapper
-from agents.extensions.models.litellm_model import LitellmModel
+from agents import Agent, Runner, function_tool, RunContextWrapper, OpenAIChatCompletionsModel
 from agents.stream_events import RunItemStreamEvent
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Async Groq client — lazily initialized on first use (after dotenv loads).
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+_groq_client: AsyncOpenAI | None = None
+
+
+def _get_groq_client() -> AsyncOpenAI:
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = AsyncOpenAI(base_url=GROQ_BASE_URL, api_key=os.getenv("GROQ_API_KEY"))
+    return _groq_client
 
 from utils.models import Result
 from utils.prompts import TOOL_DECISION_SYSTEM_PROMPT, RAG_ANSWERING_INSTRUCTIONS
@@ -205,6 +216,8 @@ def _extract_tool_steps(result) -> list[dict]:
 def _build_agent(config: dict) -> Agent[RAGContext]:
     """Create the Nexus agent with the search tool."""
     model_name = config.get("model", "groq/openai/gpt-oss-20b")
+    # Strip "groq/" prefix — Groq's API expects "openai/gpt-oss-20b" directly
+    raw_model_name = model_name.removeprefix("groq/")
     today_str = date.today().strftime("%B %d, %Y")
     instructions = TOOL_DECISION_SYSTEM_PROMPT.format(today=today_str)
 
@@ -212,7 +225,10 @@ def _build_agent(config: dict) -> Agent[RAGContext]:
         name="Nexus",
         instructions=instructions,
         tools=[search_handbook, plan_searches, send_feedback, get_in_touch],
-        model=LitellmModel(model=model_name),
+        model=OpenAIChatCompletionsModel(
+            model=raw_model_name,
+            openai_client=_get_groq_client(),
+        ),
     )
 
 
@@ -220,7 +236,7 @@ def _build_agent(config: dict) -> Agent[RAGContext]:
     wait=wait_exponential(multiplier=1, min=5, max=60),
     stop=stop_after_attempt(3),
 )
-def answer_question_agent(
+async def answer_question_agent(
     question: str,
     history: list[dict] | None = None,
     collection=None,
@@ -273,7 +289,7 @@ def answer_question_agent(
             input_messages.append({"role": role, "content": content})
     input_messages.append({"role": "user", "content": question})
 
-    result = Runner.run_sync(
+    result = await Runner.run(
         agent,
         input=input_messages,
         context=rag_context,

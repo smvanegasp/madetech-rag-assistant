@@ -342,4 +342,4 @@ if os.path.exists(frontend_path):
         
         raise HTTPException(status_code=404, detail="Not found")
 else:
-    print(f"⚠ Frontend path not found: {frontend_path}. Running in API-only mode.")
+    print(f"[WARNING] Frontend path not found: {frontend_path}. Running in API-only mode.")
