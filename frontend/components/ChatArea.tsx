@@ -283,16 +283,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
                   "Tell me more about this app",
-                  "What cycling benefits do we have?",
+                  "Data Engineer vs Software Engineer",
                   "Tell me about parental leave",
-                  "What a Lead Data Engineer does?"
+                  "What benefits do we have?"
                 ].map((q) => (
                   <button
                     key={q}
                     onClick={() => {
                       setInputValue(q);
                     }}
-                    className={`p-4 text-left text-sm rounded-xl border transition-all
+                    className={`p-4 text-left text-sm rounded-xl border transition-all flex items-center
                       ${isDark
                         ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 text-zinc-400'
                         : 'bg-white border-zinc-200 hover:border-emerald-500/30 hover:bg-emerald-50/10 text-zinc-600'}`}
