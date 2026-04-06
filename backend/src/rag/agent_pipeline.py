@@ -18,6 +18,7 @@ from typing import Any
 
 from agents import Agent, Runner, function_tool, RunContextWrapper
 from agents.extensions.models.litellm_model import LitellmModel
+from agents.stream_events import RunItemStreamEvent
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -53,9 +54,9 @@ def _format_context(chunks: list[Result]) -> str:
 
 @function_tool
 def search_handbook(ctx: RunContextWrapper[RAGContext], query: str) -> str:
-    """Search the Made Tech handbook for relevant information.
-    Use this whenever the user asks about company policies, processes,
-    benefits, roles, or any subject that requires handbook knowledge.
+    """Search the Made Tech handbook for a single topic.
+    Use this for simple questions that need one search, or as a follow-up
+    search after plan_searches if you need additional information.
     """
     chunks = fetch_context(
         query,
@@ -67,6 +68,48 @@ def search_handbook(ctx: RunContextWrapper[RAGContext], query: str) -> str:
     ctx.context.retrieved_chunks.extend(chunks)
     context_str = _format_context(chunks)
     return f"{RAG_ANSWERING_INSTRUCTIONS}\n\n{context_str}"
+
+
+@function_tool
+def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str:
+    """Plan and execute multiple handbook searches at once.
+    Use this when the question requires information from multiple topics
+    (e.g., comparing roles, asking about several benefits, multi-part questions).
+
+    Provide a list of 2-4 distinct search queries. Each query should target
+    a different topic — do not include duplicate or overlapping queries.
+
+    After reviewing the results, if you need more information you can still
+    call search_handbook for a follow-up search. If the results already
+    contain enough information, skip any remaining planned queries and
+    answer directly.
+    """
+    all_chunks = []
+    seen_content = set()
+    results_parts = []
+
+    for i, query in enumerate(queries, 1):
+        chunks = fetch_context(
+            query,
+            ctx.context.history,
+            ctx.context.collection,
+            ctx.context.openai_client,
+            ctx.context.config,
+        )
+        # Deduplicate chunks across searches
+        new_chunks = []
+        for chunk in chunks:
+            key = chunk.page_content[:200]
+            if key not in seen_content:
+                seen_content.add(key)
+                new_chunks.append(chunk)
+        all_chunks.extend(new_chunks)
+        if new_chunks:
+            results_parts.append(f"--- Search {i}: \"{query}\" ({len(new_chunks)} unique chunks) ---\n\n{_format_context(new_chunks)}")
+
+    ctx.context.retrieved_chunks.extend(all_chunks)
+    combined = "\n\n".join(results_parts)
+    return f"{RAG_ANSWERING_INSTRUCTIONS}\n\n{combined}"
 
 
 def _validate_contact_fields(name: str, email: str, message: str) -> str | None:
@@ -83,14 +126,11 @@ def _validate_contact_fields(name: str, email: str, message: str) -> str | None:
 @function_tool
 def send_feedback(ctx: RunContextWrapper[RAGContext], name: str, email: str, message: str) -> str:
     """Send user feedback about the Nexus assistant.
-    Use this when the user wants to share feedback, report a problem, or suggest
-    an improvement about the app.
-    IMPORTANT: You MUST have all three fields before calling this tool:
-    - name: the user's full name
-    - email: a valid email address
-    - message: the feedback content
-    Do NOT call this tool until you have explicitly collected all three from the user.
-    If any are missing, ask for them one by one before calling.
+    ONLY use this tool when ALL of these conditions are met:
+    1. The user has EXPLICITLY asked to send feedback (not just mentioned it in passing)
+    2. The user has provided their name, email, and feedback message in the conversation
+    3. This is the ONLY action in this turn — never combine with search_handbook or plan_searches
+    Do NOT call this tool proactively or as an intermediate step.
     """
     error = _validate_contact_fields(name, email, message)
     if error:
@@ -105,14 +145,11 @@ def send_feedback(ctx: RunContextWrapper[RAGContext], name: str, email: str, mes
 @function_tool
 def get_in_touch(ctx: RunContextWrapper[RAGContext], name: str, email: str, message: str) -> str:
     """Send a contact request to get in touch with the creator of this app.
-    Use this when the user wants to reach out, connect, ask about the project,
-    or contact the person who built Nexus.
-    IMPORTANT: You MUST have all three fields before calling this tool:
-    - name: the user's full name
-    - email: a valid email address
-    - message: what they want to discuss or say
-    Do NOT call this tool until you have explicitly collected all three from the user.
-    If any are missing, ask for them one by one before calling.
+    ONLY use this tool when ALL of these conditions are met:
+    1. The user has EXPLICITLY asked to contact or get in touch with the creator (not just mentioned it in passing)
+    2. The user has provided their name, email, and message in the conversation
+    3. This is the ONLY action in this turn — never combine with search_handbook or plan_searches
+    Do NOT call this tool proactively or as an intermediate step.
     """
     error = _validate_contact_fields(name, email, message)
     if error:
@@ -174,7 +211,7 @@ def _build_agent(config: dict) -> Agent[RAGContext]:
     return Agent[RAGContext](
         name="Nexus",
         instructions=instructions,
-        tools=[search_handbook, send_feedback, get_in_touch],
+        tools=[search_handbook, plan_searches, send_feedback, get_in_touch],
         model=LitellmModel(model=model_name),
     )
 
@@ -245,3 +282,104 @@ def answer_question_agent(
 
     tool_steps = _extract_tool_steps(result)
     return result.final_output, rag_context.retrieved_chunks, tool_steps
+
+
+async def answer_question_agent_streamed(
+    question: str,
+    history: list[dict] | None = None,
+    collection=None,
+    openai_client: OpenAI | None = None,
+    config: dict | None = None,
+):
+    """
+    Async generator that yields SSE events as the agent processes the query.
+
+    Yields dicts with "event" and "data" keys:
+    - {"event": "tool_step", "data": {"tool_name": ..., "arguments": ..., "order": ...}}
+    - {"event": "done", "data": {"content": ..., "sources": [...], "tool_steps": [...]}}
+
+    The caller is responsible for formatting these as SSE.
+    """
+    if history is None:
+        history = []
+    if config is None:
+        config = {}
+    if openai_client is None:
+        openai_client = OpenAI()
+    if collection is None:
+        raise ValueError("collection is required")
+
+    rag_context = RAGContext(
+        collection=collection,
+        openai_client=openai_client,
+        config=config,
+        history=history,
+    )
+
+    agent = _build_agent(config)
+
+    input_messages = []
+    for msg in history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            input_messages.append({"role": role, "content": content})
+    input_messages.append({"role": "user", "content": question})
+
+    result = Runner.run_streamed(
+        agent,
+        input=input_messages,
+        context=rag_context,
+        max_turns=6,
+    )
+
+    tool_order = 0
+    try:
+        async for event in result.stream_events():
+            if (
+                isinstance(event, RunItemStreamEvent)
+                and event.name == "tool_called"
+            ):
+                try:
+                    raw = event.item.raw_item
+                    tool_name = getattr(raw, "name", "unknown")
+                    arguments_str = getattr(raw, "arguments", "{}")
+                    try:
+                        arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
+                    except (json.JSONDecodeError, TypeError):
+                        arguments = {}
+
+                    tool_order += 1
+                    yield {
+                        "event": "tool_step",
+                        "data": {
+                            "tool_name": tool_name,
+                            "arguments": arguments,
+                            "order": tool_order,
+                        },
+                    }
+                except Exception:
+                    pass  # Skip malformed tool call events
+
+        # After streaming completes, extract final results
+        tool_steps = _extract_tool_steps(result)
+        yield {
+            "event": "done",
+            "data": {
+                "content": result.final_output,
+                "chunks": rag_context.retrieved_chunks,
+                "tool_steps": tool_steps,
+            },
+        }
+    except Exception as e:
+        # If streaming fails mid-way, try to get whatever result is available
+        print(f"Stream event error: {e}")
+        content = getattr(result, "final_output", None) or "I encountered an issue processing your request. Please try again."
+        yield {
+            "event": "done",
+            "data": {
+                "content": content,
+                "chunks": rag_context.retrieved_chunks,
+                "tool_steps": [],
+            },
+        }

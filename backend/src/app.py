@@ -16,6 +16,7 @@ Required environment variables:
 - FRONTEND_PATH (optional, for production static serving)
 """
 
+import json
 import os
 import time
 from pathlib import Path
@@ -24,6 +25,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.responses import StreamingResponse
 from dotenv import load_dotenv
 
 from utils.models import (
@@ -218,6 +220,74 @@ async def chat(request: ChatRequest):
     except Exception as e:
         print(f"Chat endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming chat endpoint using Server-Sent Events.
+
+    Sends tool_step events as the agent processes, then a final done event
+    with the full answer, sources, and tool steps.
+    """
+    if rag_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="RAG service not initialized.",
+        )
+
+    chat_id = request.chat_id or str(uuid4())
+    interaction_id = str(uuid4())
+    start_time = time.time()
+
+    async def event_generator():
+        final_content = ""
+        try:
+            async for event in rag_service.get_rag_response_streamed(
+                query=request.query,
+                history=request.history,
+            ):
+                if event["event"] == "tool_step":
+                    yield f"event: tool_step\ndata: {json.dumps(event['data'])}\n\n"
+                elif event["event"] == "done":
+                    data = event["data"]
+                    final_content = data.get("content", "")
+                    payload = {
+                        "content": data["content"],
+                        "sources": data["sources"],
+                        "tool_steps": data["tool_steps"],
+                        "chat_id": chat_id,
+                        "interaction_id": interaction_id,
+                    }
+                    if data.get("isError"):
+                        payload["isError"] = True
+                    yield f"event: done\ndata: {json.dumps(payload)}\n\n"
+        except Exception as e:
+            print(f"Stream error: {e}")
+            payload = {
+                "content": "I'm having trouble right now. Please try again.",
+                "sources": [],
+                "tool_steps": [],
+                "chat_id": chat_id,
+                "interaction_id": interaction_id,
+                "isError": True,
+            }
+            yield f"event: done\ndata: {json.dumps(payload)}\n\n"
+        finally:
+            response_time_ms = int((time.time() - start_time) * 1000)
+            chat_logger.log_message(
+                interaction_id=interaction_id,
+                chat_id=chat_id,
+                user_message=request.query,
+                llm_response=final_content,
+                response_time_ms=response_time_ms,
+            )
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # =============================================================================

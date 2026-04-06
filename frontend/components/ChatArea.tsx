@@ -17,7 +17,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle, Search } from 'lucide-react';
+import { Send, FileText, BookOpen, ChevronDown, ChevronUp, Loader2, RotateCcw, HelpCircle, Search, CheckCircle2, Circle } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Message, SourceChunk, ToolStep, Theme, HandbookDoc } from '../types';
 
@@ -37,6 +37,8 @@ interface ChatAreaProps {
   onRetry: () => void;
   /** Whether the AI is currently generating a response */
   isLoading: boolean;
+  /** Live tool steps streamed during loading */
+  liveToolSteps: ToolStep[];
   /** Callback to open source viewer for a specific document */
   onOpenSource: (sources: SourceChunk[], docId: string, messageId: string) => void;
   /** Current theme (light or dark) */
@@ -54,6 +56,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   onSend,
   onRetry,
   isLoading,
+  liveToolSteps,
   onOpenSource,
   theme,
   handbookDocs,
@@ -138,36 +141,51 @@ const ChatArea: React.FC<ChatAreaProps> = ({
    * @param message - The assistant message with sources to render
    * @returns React element with citation badges, or null if no sources
    */
-  const formatToolStep = (step: ToolStep): string => {
-    if (step.tool_name === 'search_handbook') {
-      const query = step.arguments?.query as string | undefined;
-      return query ? `Searched handbook for "${query}"` : 'Searched handbook';
+  /**
+   * Expands a tool step into a list of checklist items.
+   * plan_searches becomes multiple items (one per query).
+   */
+  const expandToolSteps = (steps: ToolStep[]): { label: string; done: boolean }[] => {
+    const items: { label: string; done: boolean }[] = [];
+    for (const step of steps.sort((a, b) => a.order - b.order)) {
+      if (step.tool_name === 'plan_searches') {
+        const queries = step.arguments?.queries as string[] | undefined;
+        if (queries) {
+          queries.forEach(q => items.push({ label: `Search "${q}"`, done: true }));
+        }
+      } else if (step.tool_name === 'search_handbook') {
+        const query = step.arguments?.query as string | undefined;
+        items.push({ label: query ? `Search "${query}"` : 'Search handbook', done: true });
+      } else if (step.tool_name === 'send_feedback') {
+        items.push({ label: 'Send feedback', done: true });
+      } else if (step.tool_name === 'get_in_touch') {
+        items.push({ label: 'Send contact request', done: true });
+      } else {
+        items.push({ label: step.tool_name.replace(/_/g, ' '), done: true });
+      }
     }
-    if (step.tool_name === 'send_feedback') return 'Sent feedback';
-    if (step.tool_name === 'get_in_touch') return 'Sent contact request';
-    return `Ran ${step.tool_name.replace(/_/g, ' ')}`;
+    return items;
   };
 
   const renderToolSteps = useCallback((message: Message) => {
     if (!message.toolSteps || message.toolSteps.length === 0) return null;
+    const items = expandToolSteps(message.toolSteps);
+    if (items.length === 0) return null;
 
     return (
-      <div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${
+      <div className={`mb-3 text-xs rounded-lg border px-3 py-2.5 ${
         isDark
           ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
           : 'border-zinc-100 bg-zinc-50 text-zinc-400'
       }`}>
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <Search size={11} />
-          <span className="font-medium">Steps</span>
+        <div className="space-y-1">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <CheckCircle2 size={12} className="shrink-0 text-emerald-500" />
+              <span>{item.label}</span>
+            </div>
+          ))}
         </div>
-        <ol className="space-y-0.5 pl-4 list-decimal">
-          {message.toolSteps
-            .sort((a, b) => a.order - b.order)
-            .map((step, i) => (
-              <li key={i}>{formatToolStep(step)}</li>
-            ))}
-        </ol>
       </div>
     );
   }, [isDark]);
@@ -367,11 +385,35 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             ))}
 
             {isLoading && (
-              <div className="flex items-center gap-3 animate-pulse">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
-                  <Loader2 size={16} className="animate-spin text-emerald-500" />
+              <div className="animate-in fade-in duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
+                    <Loader2 size={16} className="animate-spin text-emerald-500" />
+                  </div>
+                  <div className="text-xs font-medium text-emerald-500 tracking-wide uppercase">
+                    {liveToolSteps.length === 0 ? 'Nexus is thinking...' : 'Nexus is working...'}
+                  </div>
                 </div>
-                <div className="text-xs font-medium text-emerald-500 tracking-wide uppercase">Nexus is thinking...</div>
+                {liveToolSteps.length > 0 && (
+                  <div className={`ml-11 text-xs rounded-lg border px-3 py-2.5 space-y-1 ${
+                    isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500' : 'border-zinc-100 bg-zinc-50 text-zinc-400'
+                  }`}>
+                    {expandToolSteps(liveToolSteps).map((item, i, arr) => (
+                      <div key={i} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                        {i < arr.length - 1 ? (
+                          <CheckCircle2 size={12} className="shrink-0 text-emerald-500" />
+                        ) : (
+                          <Loader2 size={12} className="shrink-0 animate-spin text-emerald-500" />
+                        )}
+                        <span>{item.label}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 animate-pulse">
+                      <Circle size={12} className="shrink-0 opacity-30" />
+                      <span className="opacity-30">Generate answer</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

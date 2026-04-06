@@ -23,8 +23,8 @@ import ChatArea from './components/ChatArea';
 import SourceViewer from './components/SourceViewer';
 import WelcomeModal from './components/WelcomeModal';
 import ContactModal from './components/ContactModal';
-import { Chat, Message, SourceChunk, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
-import { getHandbookResponse, getHandbookDocs } from './services/apiService';
+import { Chat, Message, SourceChunk, ToolStep, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
+import { getHandbookResponse, getHandbookResponseStreamed, getHandbookDocs } from './services/apiService';
 import { PanelRight, MessageCircleHeart } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -51,6 +51,8 @@ const App: React.FC = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   /** Current value of message input field */
   const [inputValue, setInputValue] = useState('');
+  /** Live tool steps shown during loading (from SSE stream) */
+  const [liveToolSteps, setLiveToolSteps] = useState<ToolStep[]>([]);
   /** All loaded handbook documents (fetched from backend on mount) */
   const [handbookDocs, setHandbookDocs] = useState<HandbookDoc[]>([]);
   
@@ -170,7 +172,20 @@ const App: React.FC = () => {
     }));
 
     try {
-      const response = await getHandbookResponse(userQuery, currentChat?.messages || [], currentChat?.dbChatId);
+      setLiveToolSteps([]);
+      const response = await getHandbookResponseStreamed(
+        userQuery,
+        currentChat?.messages || [],
+        currentChat?.dbChatId,
+        (step) => {
+          // Deduplicate: skip if same tool+query already shown
+          const key = `${step.tool_name}:${JSON.stringify(step.arguments)}`;
+          setLiveToolSteps(prev => {
+            if (prev.some(s => `${s.tool_name}:${JSON.stringify(s.arguments)}` === key)) return prev;
+            return [...prev, step];
+          });
+        }
+      );
       const assistantMessageId = Math.random().toString(36).substring(7);
       
       const assistantMessage: Message = {
@@ -183,12 +198,13 @@ const App: React.FC = () => {
         isError: response.isError || false,
       };
 
+      setLiveToolSteps([]);
       setChats(prev => prev.map(chat => {
           if (chat.id === activeChatId) {
             const isBackground = currentChatIdRef.current !== activeChatId;
-            return { 
-              ...chat, 
-              messages: [...chat.messages, assistantMessage], 
+            return {
+              ...chat,
+              messages: [...chat.messages, assistantMessage],
               updatedAt: new Date(),
               isLoading: false,
               hasUnreadResponse: isBackground,
@@ -352,6 +368,7 @@ const App: React.FC = () => {
             onSend={handleSend}
             onRetry={handleRetry}
             isLoading={currentChat?.isLoading || false}
+            liveToolSteps={liveToolSteps}
             onOpenSource={handleOpenSource}
             theme={theme}
             handbookDocs={handbookDocs}

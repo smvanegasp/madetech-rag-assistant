@@ -21,6 +21,7 @@
 - ~~**[COLLAB]** Verify tablet experience end-to-end~~ — Done: manually verified on iPhone and iPad.
 
 **Additional improvements made during this session:**
+
 - Textarea auto-grows naturally like WhatsApp (no letter clipping mid-line), with `overscroll-behavior: contain` to prevent scroll chaining on touch devices.
 - Send button repositioned inline next to textarea (was in its own row below) for a cleaner, more space-efficient input bar.
 - Welcome screen book icon moved inline next to "Knowledge Search" title to avoid clipping on short viewports (e.g., Chrome on iPhone).
@@ -60,6 +61,7 @@
 - ~~**[COLLAB]** Optional popup tutorial / onboarding GIFs~~ — Deferred: needs GIF content created first (see Pending Items).
 
 **Additional improvements made during this session:**
+
 - System prompt now uses human-readable names in the handbook file index ("Delivery Manager" not "delivery_manager") with explicit instruction to present names naturally.
 - Nexus told it doesn't know anything about the user (no assumed name, role, or team).
 - "Tell me about this app" now answered directly from system prompt — Nexus knows "this app" refers to itself.
@@ -90,26 +92,26 @@
 - ~~**[CLAUDE-CODE]** Create a "get in touch" tool~~ — Done: `@function_tool get_in_touch` same pattern for contact requests. Both tools registered in the Nexus agent.
 - ~~**[CLAUDE-CODE]** Add input guardrails~~ — Done: added to system prompt. Non-English → asks to rephrase in English. Off-topic → redirects to Made Tech topics. Gibberish → asks to clarify. All tested and working.
 
-### 3.3 Multi-Tool Orchestration
+### 3.3 Multi-Tool Orchestration — COMPLETED
 
-- **[CLAUDE-CODE]** Create a planning/execution tool: Build a tool that lets the orchestrator LLM plan multi-step queries. Example: *"Compare Lead Engineer vs Software Engineer"* → Plan: (1) RAG query for Lead Engineer, (2) RAG query for Software Engineer, (3) Compare and respond.
-- **[CLAUDE-CODE]** Support multiple RAG tool calls: Enable the agent to make multiple independent RAG queries in a single user interaction (needed for comparison questions, multi-topic queries).
-- **[COLLAB]** Handle diverse input types gracefully: Configure the orchestrator to recognize and route different input types appropriately:
-  - Single question (single or multi-source)
-  - Multiple independent questions
-  - Unrelated / off-topic questions
-  - Accidental typing / gibberish
-  - General-purpose questions (answerable from system prompt)
-  - Feedback or contact requests (route to tools from 3.2)
-- **[COLLAB]** Experiment with tool configurations: Add/remove tools from the tool list and test behavior. Investigate whether the system prompt needs to explicitly describe available tools or if SDK-provided tool descriptions are sufficient.
+- ~~**[CLAUDE-CODE]** Create a planning/execution tool~~ — Done: `@function_tool plan_searches` takes a list of queries and executes all searches at once with cross-search chunk deduplication. LLM plans upfront for complex questions instead of making sequential calls.
+- ~~**[CLAUDE-CODE]** Support multiple RAG tool calls~~ — Done: `max_turns=6` allows multiple tool calls. Chunks accumulate via `.extend()` with deduplication in `_extract_sources`. Sources capped at 15 unique entries to cover multi-search results.
+- ~~**[COLLAB]** Handle diverse input types gracefully~~ — Done: system prompt guides routing for all input types — single questions use `search_handbook`, comparisons use `plan_searches`, greetings/structural questions answered from prompt, off-topic/non-English/gibberish handled by guardrails, feedback/contact routed exclusively to their tools.
+
+**Additional improvements made during this session:**
+- `plan_searches` executes all queries in one tool call (no sequential LLM round-trips), deduplicates chunks across searches, and returns combined labeled results.
+- Prompt instructs LLM to be judicious with tool calls: prefer broad searches, never repeat queries, answer from plan_searches results without follow-up searches.
+- Feedback/contact tools marked as exclusive actions — never combined with handbook searches.
+- Concise response style: cover key points, offer to elaborate if more info available.
+- Table formatting capped at 4 columns max (prefer 2).
 
 ### 3.4 Advanced Search
 
 - **[COLLAB]** Add a web/SEO search tool: Create a tool that combines RAG results with live web search for more comprehensive answers. *(Decide on search provider — e.g., Serper, Tavily, Brave; Claude Code integrates it.)*
 
-### 3.5 Tool-Calling Transparency (Frontend)
+### 3.5 Tool-Calling Transparency (Frontend) — COMPLETED
 
-- **[CLAUDE-CODE]** Show the tool-calling pattern to the user: Display a collapsible "thinking" or "steps" section in the UI that shows which tools the LLM called and in what order (e.g., *"Searching handbook for Lead Engineer… Searching handbook for Software Engineer… Comparing results…"*). Requires the backend to stream or return tool-call metadata.
+- ~~**[CLAUDE-CODE]** Show the tool-calling pattern to the user~~ — Done: real-time SSE streaming of tool steps. Backend streams `tool_step` events via `POST /api/chat/stream` as the agent processes, then a `done` event with the full answer. Frontend shows a live checklist with animated step-by-step progress: completed steps get green checkmarks, current step shows a spinner, and "Generate answer" appears as pending. `plan_searches` expands into individual checklist items with a 600ms stagger delay for a polished feel.
 
 ---
 
@@ -140,12 +142,12 @@
 ## Summary View
 
 
-| Phase | Focus                                         | Effort     | Items    |
-| ----- | --------------------------------------------- | ---------- | -------- |
-| **1** | Bug fixes, quick wins, system prompt          | Low–Medium | 14 items |
-| **2** | Frontend UX, RAG investigation                | Medium     | 8 items  |
-| **3** | SDK migration, new tools, multi-agent         | High       | 11 items |
-| **4** | Content, docs, DevOps                         | Varies     | 8 items  |
+| Phase | Focus                                 | Effort     | Items    |
+| ----- | ------------------------------------- | ---------- | -------- |
+| **1** | Bug fixes, quick wins, system prompt  | Low–Medium | 14 items |
+| **2** | Frontend UX, RAG investigation        | Medium     | 8 items  |
+| **3** | SDK migration, new tools, multi-agent | High       | 11 items |
+| **4** | Content, docs, DevOps                 | Varies     | 8 items  |
 
 
 ---
@@ -165,3 +167,4 @@
 - **[MANUAL]** Write articles about the project: Blog posts, write-ups, or case studies to link from the app and system prompt. Once available, add URLs to the system prompt and UI. Also needed for article/resource links in the app UI. *(Referenced in Phase 1.3, Phase 2.1, and Phase 4.1.)*
 - **[COLLAB]** Build popup tutorial / onboarding GIFs: Create a short walkthrough (2–4 steps) showing app features, then build a carousel component. *(Referenced in Phase 2.1.)*
 - **[COLLAB]** Add cost monitoring: Log token counts per request to Supabase for usage tracking. Not needed while $5/month caps are in place — revisit if budget limits are raised. *(Referenced in Phase 1.4.)*
+

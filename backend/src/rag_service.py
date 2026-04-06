@@ -22,7 +22,7 @@ from utils.models import Message, SourceChunk
 
 from .config_loader import load_config
 from .rag import get_chroma_collection
-from .rag.agent_pipeline import answer_question_agent
+from .rag.agent_pipeline import answer_question_agent, answer_question_agent_streamed
 
 load_dotenv(override=True)
 
@@ -167,4 +167,54 @@ class RAGService:
                 "content": "I'm having trouble processing your request right now. Please try again in a moment.",
                 "sources": [],
                 "tool_steps": [],
+            }
+
+    async def get_rag_response_streamed(
+        self,
+        query: str,
+        history: List[Message],
+    ):
+        """
+        Async generator that yields SSE events as the agent processes the query.
+
+        Yields tool_step events in real-time, then a final done event with the answer.
+        """
+        history_msgs = _history_to_messages(history[-30:])
+        pipeline_config = {
+            **self.config,
+            "use_query_rewriting": self.config.get("use_query_rewriting", False),
+            "use_reranking": self.config.get("use_reranking", False),
+        }
+
+        try:
+            async for event in answer_question_agent_streamed(
+                query,
+                history=history_msgs,
+                collection=self.collection,
+                openai_client=self.openai_client,
+                config=pipeline_config,
+            ):
+                if event["event"] == "tool_step":
+                    yield event
+                elif event["event"] == "done":
+                    data = event["data"]
+                    sources = self._extract_sources(data["chunks"])
+                    yield {
+                        "event": "done",
+                        "data": {
+                            "content": data["content"],
+                            "sources": [s.model_dump() for s in sources],
+                            "tool_steps": data["tool_steps"],
+                        },
+                    }
+        except Exception as e:
+            print(f"RAG service streaming error: {e}")
+            yield {
+                "event": "done",
+                "data": {
+                    "content": "I'm having trouble processing your request right now. Please try again in a moment.",
+                    "sources": [],
+                    "tool_steps": [],
+                    "isError": True,
+                },
             }
