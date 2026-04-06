@@ -1,181 +1,204 @@
-# Backend
+# Backend — FastAPI + OpenAI Agents SDK
 
-FastAPI backend for the RAG handbook chatbot. Serves the chat API, highlights API, and (in production) the frontend.
+FastAPI backend powering the Nexus chatbot. Uses the OpenAI Agents SDK for agentic tool orchestration, ChromaDB Cloud for semantic search, BM25 for keyword search, and Groq for LLM inference.
 
 ## Quick Start
 
 ```bash
 cd backend
-uv run uvicorn src.app:app --reload --port 9481
+uv venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+uv pip install -e .
+uvicorn src.app:app --reload --port 9481
 ```
 
-Ensure `backend/.env` has `GROQ_API_KEY` and `OPENAI_API_KEY`. The vector database must exist at `data/vector_db` (see [Ingestion](#ingestion)).
+Requires `backend/.env` with API keys (see [Environment Variables](#environment-variables)).
 
----
+## Architecture
 
-## Architecture Overview
+```mermaid
+flowchart TB
+    subgraph App ["src/app.py"]
+        Routes["/api/chat/stream\n/api/chat\n/api/handbook\n/api/contact\n/api/health"]
+    end
 
+    subgraph Service ["src/rag_service.py"]
+        RS["RAGService"]
+        BM25Idx["BM25 Index\n(built at startup)"]
+        RS --- BM25Idx
+    end
+
+    subgraph Agent ["src/rag/agent_pipeline.py"]
+        Nexus["Agent: Nexus\n(OpenAI Agents SDK)"]
+        subgraph Tools ["@function_tool"]
+            direction LR
+            T1["search_handbook"]
+            T2["plan_searches"]
+            T3["send_feedback"]
+            T4["get_in_touch"]
+        end
+        Nexus --> Tools
+    end
+
+    subgraph Pipeline ["src/rag/pipeline.py"]
+        FC["fetch_context()"]
+        subgraph Hybrid ["Hybrid Retrieval"]
+            Semantic["Semantic\n(ChromaDB + embeddings)"]
+            Keyword["BM25 Keyword\n(rank-bm25)"]
+        end
+        FC --> Hybrid
+    end
+
+    subgraph Shared ["utils/"]
+        Models["models.py\n(Pydantic)"]
+        Prompts["prompts.py\n(System prompts)"]
+    end
+
+    Routes --> RS
+    RS --> Nexus
+    T1 --> FC
+    T2 --> FC
+    T3 --> Contact["contact_service.py\n(Resend email)"]
+    T4 --> Contact
+    Routes -.-> Logger["chat_logger.py\n(Supabase)"]
 ```
-                    ┌─────────────────────────────────────────────────────────┐
-                    │                      src/app.py                          │
-                    │  FastAPI app · CORS · startup · API routes              │
-                    └───────────────┬─────────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────┼───────────────────────────┐
-        │                           │                           │
-        ▼                           ▼                           ▼
-┌───────────────┐         ┌──────────────────┐         ┌──────────────────┐
-│ /api/chat     │         │ /api/highlights  │         │ /api/handbook     │
-│ ChatRequest   │         │ HighlightsRequest│         │ (static data)     │
-└───────┬───────┘         └────────┬─────────┘         └────────┬──────────┘
-        │                          │                            │
-        ▼                          ▼                            │
-┌───────────────────┐    ┌───────────────────┐                  │
-│ RAGService        │    │ highlights_service │                  │
-│ get_rag_response()│    │ get_relevance_    │                  │
-└─────────┬─────────┘    │ highlights()      │                  │
-          │              └───────────────────┘                  │
-          │  (delegates to rag pipeline)                         │
-          ▼                                                      ▼
-┌───────────────────────────────────────┐              ┌──────────────────┐
-│ src/rag/pipeline.py                   │              │ handbook_loader  │
-│ answer_question()                      │              │ load_handbook_   │
-│   → fetch_context()                   │              │ documents()      │
-│   → make_rag_messages()               │              └──────────────────┘
-│   → litellm.completion()              │
-└───────────────┬───────────────────────┘
-                │
-    ┌───────────┼───────────┬───────────────┐
-    ▼           ▼           ▼               ▼
-retrieval  query_rewriting  reranking   config_loader
-(ChromaDB) (LLM)            (LLM)       (config.yaml)
-```
-
----
 
 ## Directory Structure
 
 ```
 backend/
-├── config.yaml           # RAG config (approach, retrieval, model)
+├── config.yaml                  # RAG pipeline configuration
+├── pyproject.toml               # Dependencies (UV)
+├── src/
+│   ├── app.py                   # FastAPI app, routes, SSE streaming, startup
+│   ├── config_loader.py         # Load and resolve config.yaml
+│   ├── rag_service.py           # RAG orchestration, BM25 index init, source extraction
+│   ├── handbook_loader.py       # Load .md files → HandbookDoc objects
+│   ├── chat_logger.py           # Async chat logging to Supabase PostgreSQL
+│   ├── contact_service.py       # Feedback/contact emails via Resend
+│   └── rag/                     # RAG pipeline modules
+│       ├── agent_pipeline.py    # OpenAI Agents SDK: agent, tools, streaming
+│       ├── pipeline.py          # Legacy pipeline (kept for experiments)
+│       ├── retrieval.py         # ChromaDB Cloud + OpenAI embeddings
+│       ├── keyword_search.py    # BM25 keyword search index
+│       ├── query_rewriting.py   # LLM query expansion (disabled in production)
+│       └── reranking.py         # LLM chunk reordering (disabled in production)
+├── utils/
+│   ├── models.py                # All Pydantic models (API, RAG, evaluation)
+│   └── prompts.py               # System prompts (tool decision, RAG, rewriting, etc.)
 ├── data/
-│   ├── handbook/         # Markdown source files (loaded at startup)
-│   └── vector_db/         # ChromaDB (created by ingest script)
-├── src/                   # Application code
-│   ├── app.py             # FastAPI app, routes, startup
-│   ├── config_loader.py   # Load and resolve config.yaml
-│   ├── rag_service.py     # RAG orchestration (delegates to rag/)
-│   ├── handbook_loader.py # Load .md files → HandbookDoc
-│   ├── highlights_service.py  # "Highlight with AI" (litellm)
-│   └── rag/               # RAG pipeline
-│       ├── pipeline.py    # fetch_context, answer_question
-│       ├── retrieval.py  # ChromaDB + OpenAI embeddings
-│       ├── query_rewriting.py  # LLM query expansion
-│       └── reranking.py  # LLM chunk reordering
-├── utils/                 # Shared models and prompts
-│   ├── models.py          # HandbookDoc, Result, SourceChunk, API models
-│   └── prompts.py         # RAG_SYSTEM_PROMPT, etc.
-└── scripts/               # Ingestion (chunking, embedding)
-    └── 01_llm_chunking_embedding/
+│   └── handbook/                # 161 markdown source files (6 categories)
+└── scripts/
+    └── 01_llm_chunking_embedding/  # Vector DB ingestion pipeline
 ```
 
----
+## Request Flow
 
-## Request Flows
+### Streaming Chat (`POST /api/chat/stream`)
 
-### Chat (`POST /api/chat`)
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as /api/chat/stream
+    participant S as RAGService
+    participant AG as Agent (Nexus)
+    participant R as Hybrid Retrieval
 
-1. **Request**: `ChatRequest` with `query` and `history`
-2. **RAGService.get_rag_response()**:
-   - Converts `history` to `list[dict]`
-   - Calls `rag.answer_question()`
-3. **rag.pipeline.answer_question()**:
-   - **fetch_context()**:
-     - Embeds question (OpenAI), queries ChromaDB for `retrieval_k` chunks
-     - If `use_query_rewriting`: rewrites question, fetches again, merges
-     - If `use_reranking`: LLM reorders chunks, take top `final_k`
-   - **make_rag_messages()**: System prompt + context + history + question
-   - **litellm.completion()**: Groq model from config
-4. **RAGService**: Maps `Result` chunks to `SourceChunk`, returns `{content, sources}`
+    F->>A: ChatRequest (query, history)
+    A->>S: get_rag_response_streamed()
+    S->>AG: Runner.run_streamed()
 
-### Highlights (`POST /api/highlights`)
+    loop Agent Tool Loop
+        AG->>AG: LLM decides: search or answer?
+        alt Tool call
+            AG-->>A: SSE: tool_step event
+            A-->>F: SSE: tool_step (real-time)
+            AG->>R: fetch_context(query)
+            R->>R: Semantic + BM25 → merge → dedupe
+            R-->>AG: chunks
+        end
+    end
 
-1. **Request**: `HighlightsRequest` with `answer` and `document_content`
-2. **get_relevance_highlights()**: Litellm completion (Groq primary, OpenAI fallback) with JSON mode
-3. Returns verbatim phrases from the document that support the answer; frontend wraps them in `<mark>`
+    AG-->>S: final_output + chunks
+    S->>S: extract_sources(chunks)
+    S-->>A: content + sources + tool_steps
+    A-->>F: SSE: done event
+    A->>A: log to Supabase (async)
+```
 
----
+### Non-streaming Chat (`POST /api/chat`)
+
+Same flow but returns a single JSON `ChatResponse` instead of SSE events. Used as fallback.
+
+## Agent Tools
+
+| Tool | Purpose | When Used |
+|------|---------|-----------|
+| `search_handbook` | Single semantic + keyword search | Simple, single-topic questions |
+| `plan_searches` | Multiple searches at once, deduplicated | Comparisons, multi-topic questions |
+| `send_feedback` | Send feedback email via Resend | User explicitly asks to give feedback |
+| `get_in_touch` | Send contact email via Resend | User explicitly asks to contact creator |
+
+Tools are defined with `@function_tool` decorators in `agent_pipeline.py`. The SDK auto-generates JSON schemas from function signatures. `send_feedback` and `get_in_touch` include field validation — they reject calls with missing/placeholder data and instruct the LLM to ask the user.
 
 ## Configuration
 
-`config.yaml` (or `RAG_CONFIG_PATH`) controls:
+`config.yaml` controls the RAG pipeline:
 
-| Key | Description |
-|-----|-------------|
-| `vector_db.path` | ChromaDB directory (relative to backend root) |
-| `vector_db.collection_name` | Collection name (default `docs`) |
-| `embedding_model` | Must match ingestion (default `text-embedding-3-large`) |
-| `retrieval.retrieval_k` | Chunks per query (default 20) |
-| `retrieval.final_k` | Chunks passed to LLM after reranking (default 10) |
-| `model` | LLM for rewriting, reranking, answer (default `groq/openai/gpt-oss-20b`) |
-| `approach.use_query_rewriting` | Expand follow-ups for better retrieval |
-| `approach.use_reranking` | LLM reorders chunks before generation |
+| Key | Description | Default |
+|-----|-------------|---------|
+| `vector_db.database` | ChromaDB Cloud database | `madetech_handbook` |
+| `vector_db.collection_name` | ChromaDB collection | `docs` |
+| `embedding_model` | Must match ingestion model | `text-embedding-3-large` |
+| `retrieval.retrieval_k` | Chunks retrieved per query | `10` |
+| `retrieval.final_k` | Chunks passed to LLM | `10` |
+| `model` | LLM for the agent | `groq/openai/gpt-oss-20b` |
+| `approach.use_query_rewriting` | Explicit query rewriting (disabled) | `false` |
+| `approach.use_reranking` | LLM chunk reordering (disabled) | `false` |
+| `approach.use_keyword_search` | BM25 hybrid search | `true` |
 
-**Approach variants:**
-- `basic_rag`: both `false`
-- `with_reranking`: rewriting `false`, reranking `true`
-- `with_rewriting`: rewriting `true`, reranking `false`
-- `with_rewriting_and_reranking`: both `true` (recommended)
+## System Prompt
 
----
+The `TOOL_DECISION_SYSTEM_PROMPT` in `utils/prompts.py` contains:
 
-## Key Files Explained
-
-| File | Role |
-|------|------|
-| **app.py** | Entry point. Loads handbook, initialises RAG, defines routes. CORS for local dev; static serving in production. |
-| **rag_service.py** | Thin wrapper: calls `answer_question`, extracts sources. No retrieval logic. |
-| **rag/pipeline.py** | Core RAG flow. `fetch_context` does retrieval + optional rewrite + optional rerank. `answer_question` builds messages and calls the LLM. |
-| **rag/retrieval.py** | ChromaDB connection and `fetch_context_unranked` (embed → query → Result list). |
-| **rag/query_rewriting.py** | Single function `rewrite_query`: LLM turns a follow-up into a standalone search query. |
-| **rag/reranking.py** | `rerank`: LLM returns permutation of chunk IDs; we reorder. `merge_chunks`: dedupe when combining original + rewritten results. |
-| **config_loader.py** | Reads YAML, resolves paths, merges `approach` flags, provides defaults. |
-| **handbook_loader.py** | Scans `data/handbook/*.md`, parses frontmatter, builds `HandbookDoc` list. |
-| **highlights_service.py** | Litellm JSON completion to extract supporting phrases from a document. |
-| **utils/models.py** | Canonical Pydantic models (HandbookDoc, Result, SourceChunk, ChatRequest, etc.). |
-| **utils/prompts.py** | System prompts (RAG_SYSTEM_PROMPT, etc.). |
-
----
-
-## Ingestion
-
-The vector database is created separately. From the repo root:
-
-```bash
-python -m backend.scripts.01_llm_chunking_embedding.main
-```
-
-(Adjust to your project’s ingest entrypoint if different.) This chunks handbook markdown and embeds with OpenAI `text-embedding-3-large`, storing results in ChromaDB at `data/vector_db`.
-
----
+- Nexus identity and behavioral rules
+- Dynamic date injection (`{today}`)
+- Project context and disclaimers
+- Complete handbook content index (all 161 documents, human-readable names)
+- Topics the handbook does NOT cover
+- Tool usage guidance (when to search, when to plan, when to answer directly)
+- Input guardrails (English-only, Made Tech-related, gibberish detection)
+- Formatting guidelines (bold, tables max 4 columns, concise with offer to elaborate)
 
 ## Environment Variables
 
-| Variable | Purpose |
-|----------|---------|
-| `GROQ_API_KEY` | Groq API key (chat, highlights) |
-| `OPENAI_API_KEY` | OpenAI API key (embeddings, fallback) |
-| `RAG_CONFIG_PATH` | Override path to config YAML |
-| `FRONTEND_PATH` | Static frontend dir (Docker default: `/app/frontend/dist`) |
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `GROQ_API_KEY` | Groq LLM API | Yes |
+| `OPENAI_API_KEY` | Embeddings + fallback | Yes |
+| `CHROMA_API_KEY` | ChromaDB Cloud | Yes |
+| `TENANT_CHROMA` | ChromaDB Cloud tenant | Yes |
+| `DATABASE_URL` | Supabase PostgreSQL (chat logging) | No |
+| `RESEND_API_KEY` | Resend email API | No |
+| `CONTACT_EMAIL` | Feedback destination | No |
+| `RAG_CONFIG_PATH` | Override config.yaml path | No |
+| `FRONTEND_PATH` | Static frontend dir (Docker) | No |
 
----
+## API Endpoints
 
-## Running
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/chat/stream` | SSE streaming chat (primary) |
+| `POST` | `/api/chat` | Non-streaming chat (fallback) |
+| `GET` | `/api/handbook` | All handbook documents (source viewer) |
+| `POST` | `/api/contact` | Direct contact/feedback email |
+| `GET` | `/api/health` | Health check + document count |
 
-**Local:**
+## Vector DB Ingestion
+
+First-time setup (from `backend/` directory):
+
 ```bash
-uv run uvicorn src.app:app --reload --port 9481
+python -m scripts.ingest
 ```
-Frontend (Vite) typically runs on 3000; CORS is configured for that origin.
 
-**Docker:** The image serves both API and static frontend. API on `/api/*`, frontend on other paths.
+Chunks handbook markdown → generates LLM headlines/summaries → embeds with `text-embedding-3-large` → stores in ChromaDB Cloud.
