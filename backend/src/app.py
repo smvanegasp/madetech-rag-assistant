@@ -90,7 +90,7 @@ async def startup_event():
         # Initialize RAG service with config (config.yaml in backend/)
         # Vector DB path comes from config; defaults to backend/data/vector_db
         config = load_config()
-        rag_service = RAGService(config=config)
+        rag_service = RAGService(config=config, handbook_docs=handbook_docs)
     except Exception as e:
         print(f"✗ Error during startup: {e}")
         raise

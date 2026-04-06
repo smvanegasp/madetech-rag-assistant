@@ -97,6 +97,17 @@ def fetch_context(
     else:
         chunks = chunks1
 
+    # Merge BM25 keyword search results if enabled
+    bm25_index = config.get("bm25_index")
+    if bm25_index is not None:
+        bm25_results = bm25_index.search(original_question, top_k=5)
+        # Deduplicate by content prefix
+        seen = {chunk.page_content[:200] for chunk in chunks}
+        for result in bm25_results:
+            if result.page_content[:200] not in seen:
+                seen.add(result.page_content[:200])
+                chunks.append(result)
+
     if use_reranking:
         reranked = rerank(original_question, chunks, model)
         return reranked[:final_k]

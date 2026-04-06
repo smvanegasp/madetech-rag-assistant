@@ -21,6 +21,7 @@ dependencies = [
     "litellm>=1.0.0",
     "openai-agents[litellm]>=0.1.0",
     "tenacity>=8.0.0",
+    "rank-bm25>=0.2.2",
     "tqdm>=4.0.0",
     "psycopg2-binary>=2.9.0",
     "resend>=2.26.0",

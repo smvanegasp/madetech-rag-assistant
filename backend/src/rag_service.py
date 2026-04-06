@@ -20,9 +20,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from utils.models import Message, SourceChunk
 
+from utils.models import HandbookDoc
 from .config_loader import load_config
 from .rag import get_chroma_collection
 from .rag.agent_pipeline import answer_question_agent, answer_question_agent_streamed
+from .rag.keyword_search import HandbookBM25Index
 
 load_dotenv(override=True)
 
@@ -47,7 +49,7 @@ class RAGService:
     - with_rewriting_and_reranking: Both enabled (recommended)
     """
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None, handbook_docs: list[HandbookDoc] | None = None):
         config = config if config is not None else load_config()
         self.config = config
         self.collection_name = config["vector_db"]["collection_name"]
@@ -78,8 +80,14 @@ class RAGService:
             if config.get("use_query_rewriting")
             else "basic_rag"
         )
+        # Build BM25 keyword search index if enabled and docs available
+        self.bm25_index = None
+        if config.get("use_keyword_search", False) and handbook_docs:
+            self.bm25_index = HandbookBM25Index(handbook_docs)
+
         print(
-            f"RAG service initialized ({approach_desc}) with Chroma Cloud collection '{self.collection_name}'"
+            f"RAG service initialized ({approach_desc}, keyword_search={'on' if self.bm25_index else 'off'}) "
+            f"with Chroma Cloud collection '{self.collection_name}'"
         )
 
     def _extract_sources(
@@ -150,6 +158,7 @@ class RAGService:
                 **self.config,
                 "use_query_rewriting": self.config.get("use_query_rewriting", False),
                 "use_reranking": self.config.get("use_reranking", False),
+                "bm25_index": self.bm25_index,
             }
             answer, chunks, tool_steps = await asyncio.to_thread(
                 answer_question_agent,
@@ -184,6 +193,7 @@ class RAGService:
             **self.config,
             "use_query_rewriting": self.config.get("use_query_rewriting", False),
             "use_reranking": self.config.get("use_reranking", False),
+            "bm25_index": self.bm25_index,
         }
 
         try:

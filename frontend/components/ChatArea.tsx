@@ -336,7 +336,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
-                  "Tell me more about this app",
+                  "Tell me about parental leave",
                   "Data Engineer vs Software Engineer",
                   "What benefits do we have?",
                 ].map((q) => (
