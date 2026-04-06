@@ -41,7 +41,7 @@
 
 | Item | Status |
 |------|--------|
-| OpenAI Agents SDK migration | `agent_pipeline.py` with `@function_tool`, `Runner.run_sync()`, `LitellmModel` |
+| OpenAI Agents SDK migration | `agent_pipeline.py` with `@function_tool`, `await Runner.run()`, `AsyncOpenAI` + `OpenAIChatCompletionsModel` (fully async) |
 | Send feedback tool | `@function_tool` with validation, calls `contact_service.py` |
 | Get in touch tool | Same pattern, exclusive action (never combined with searches) |
 | Input guardrails | Non-English, off-topic, gibberish handled in system prompt |
@@ -105,7 +105,7 @@ Frontend (React 19 + Vite)
   └── "Surprise me" random question generator
 
 Backend (FastAPI + OpenAI Agents SDK)
-  ├── Agent: "Nexus" with LitellmModel (groq/openai/gpt-oss-20b)
+  ├── Agent: "Nexus" with AsyncOpenAI → Groq (groq/openai/gpt-oss-20b)
   ├── Tools: search_handbook, plan_searches, send_feedback, get_in_touch
   ├── Hybrid retrieval: semantic (ChromaDB) + BM25 keyword search
   ├── Config-driven: config.yaml controls model, retrieval, approach flags
