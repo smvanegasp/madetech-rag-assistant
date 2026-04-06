@@ -80,7 +80,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, theme }) =
         </div>
 
         {/* Body */}
-        <div className={`px-6 pb-5 space-y-3 text-sm leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+        <div className={`px-6 pb-5 space-y-4 text-sm leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
           <p>
             This assistant helps Made Tech employees explore company policies, benefits, roles, and ways of working by searching the{' '}
             <a
@@ -91,47 +91,41 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, theme }) =
             >
               Made Tech Handbook
             </a>
-            .
+            {' '}(Jan 2026 snapshot).
           </p>
-          <p>
-            Created by{' '}
+
+          <div className={`flex items-center gap-3 text-xs ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+            <span>Built by{' '}
+              <a
+                href="https://www.linkedin.com/in/sergio-vanegas/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`underline underline-offset-2 transition-colors ${isDark ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-500'}`}
+              >Sergio Vanegas</a>
+            </span>
+            <span>·</span>
             <a
-              href="https://www.linkedin.com/in/sergio-vanegas/"
+              href="https://github.com/smvanegasp/madetech-rag-assistant"
               target="_blank"
               rel="noopener noreferrer"
               className={`underline underline-offset-2 transition-colors ${isDark ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-500'}`}
-            >Sergio Vanegas</a>
-            , MBA student at Harvard Business School and former Lead Data Scientist.
-          </p>
+            >View source code</a>
+          </div>
 
-          <div className={`rounded-xl p-4 text-xs space-y-1.5 ${isDark ? 'bg-zinc-800/60 text-zinc-400' : 'bg-zinc-50 text-zinc-500'}`}>
-            <p className={`font-medium text-xs mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Disclaimer</p>
-            <ul className="space-y-1.5 list-none">
+          <div className={`rounded-xl p-4 text-xs space-y-2.5 ${isDark ? 'bg-zinc-800/60 text-zinc-400' : 'bg-zinc-50 text-zinc-500'}`}>
+            <p className={`font-medium ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Why this exists</p>
+            <p>Nobody reads HR policies until they need a quick answer. The usual path — searching folders, emailing HR, asking colleagues — is slow and often outdated. Nexus is an <strong className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>agentic RAG chatbot</strong> that searches 161 handbook documents using semantic and keyword search.</p>
+            <ul className="space-y-0.5 list-none">
               {[
-                'Not an official Made Tech product, policy authority, HR authority, or legal advisor.',
-                'Treat answers as informational guidance only.',
-                'For decisions with legal, HR, or material consequences, verify with the current official handbook and the appropriate Made Tech contact.',
-              ].map((item, i) => (
+                ['24/7 availability', 'Answers when you need them, not when HR is online.'],
+                ['Grounded answers', 'Every response referenced in official documents.'],
+                ['Conversational', 'Ask follow-ups naturally, like chatting with a colleague.'],
+              ].map(([title, desc], i) => (
                 <li key={i} className="flex gap-2">
-                  <span className={`mt-0.5 shrink-0 ${isDark ? 'text-emerald-500' : 'text-emerald-500'}`}>·</span>
-                  <span>{item}</span>
+                  <span className="mt-0.5 shrink-0 text-emerald-500">·</span>
+                  <span><strong className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{title}.</strong> {desc}</span>
                 </li>
               ))}
-              <li className="flex gap-2">
-                <span className={`mt-0.5 shrink-0 ${isDark ? 'text-emerald-500' : 'text-emerald-500'}`}>·</span>
-                <span>
-                  Handbook content was snapshotted in January 2026 from the{' '}
-                  <a
-                    href="https://github.com/madetech/handbook"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`underline underline-offset-2 transition-colors ${isDark ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-500'}`}
-                  >
-                    Made Tech Handbook repository
-                  </a>
-                  {' '}and may not reflect current policies.
-                </span>
-              </li>
             </ul>
           </div>
         </div>
