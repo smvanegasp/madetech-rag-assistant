@@ -78,13 +78,18 @@ def search_handbook(ctx: RunContextWrapper[RAGContext], query: str) -> str:
     Good: 'parental leave policy'
     Bad: 'Made Tech handbook parental leave policy'
     """
-    chunks = fetch_context(
-        query,
-        ctx.context.history,
-        ctx.context.collection,
-        ctx.context.openai_client,
-        ctx.context.config,
-    )
+    try:
+        chunks = fetch_context(
+            query,
+            ctx.context.history,
+            ctx.context.collection,
+            ctx.context.openai_client,
+            ctx.context.config,
+        )
+    except Exception as e:
+        logger.warning("search_handbook failed (%s: %s)", type(e).__name__, e)
+        return "This search failed due to a temporary issue. Try answering with the context you already have, or attempt a different search."
+
     ctx.context.retrieved_chunks.extend(chunks)
     context_str = _format_context(chunks)
     return f"{RAG_ANSWERING_INSTRUCTIONS}\n\n{context_str}"
@@ -109,16 +114,23 @@ def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str
     all_chunks = []
     seen_content = set()
     results_parts = []
+    failed_queries = []
 
     for i, query in enumerate(queries, 1):
-        chunks = fetch_context(
-            query,
-            ctx.context.history,
-            ctx.context.collection,
-            ctx.context.openai_client,
-            ctx.context.config,
-        )
-        # Deduplicate chunks across searches
+        try:
+            chunks = fetch_context(
+                query,
+                ctx.context.history,
+                ctx.context.collection,
+                ctx.context.openai_client,
+                ctx.context.config,
+            )
+        except Exception as e:
+            logger.warning("plan_searches: query %d/%d failed (%s: %s), skipping",
+                           i, len(queries), type(e).__name__, e)
+            failed_queries.append(query)
+            continue
+
         new_chunks = []
         for chunk in chunks:
             key = chunk.page_content[:200]
@@ -131,6 +143,14 @@ def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str
 
     ctx.context.retrieved_chunks.extend(all_chunks)
     combined = "\n\n".join(results_parts)
+
+    if failed_queries and not results_parts:
+        return "All searches failed due to a temporary issue. Please answer based on conversation context, or try again."
+
+    if failed_queries:
+        skipped = ", ".join(f'"{q}"' for q in failed_queries)
+        combined += f"\n\n(Note: {len(failed_queries)} search(es) failed and were skipped: {skipped}. Answer using the results above.)"
+
     return f"{RAG_ANSWERING_INSTRUCTIONS}\n\n{combined}"
 
 
