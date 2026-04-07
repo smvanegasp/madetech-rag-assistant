@@ -43,7 +43,7 @@ export async function getHandbookResponseStreamed(
   query: string,
   history: Message[],
   chatId: string | undefined,
-  onToolStep: (step: ToolStep) => void
+  onToolStep: (step: ToolStep) => void,
 ) {
   try {
     const response = await fetch(`${API_URL}/api/chat/stream`, {
@@ -58,7 +58,7 @@ export async function getHandbookResponseStreamed(
           timestamp: m.timestamp
         })),
         chat_id: chatId ?? null
-      })
+      }),
     });
 
     if (!response.ok || !response.body) {

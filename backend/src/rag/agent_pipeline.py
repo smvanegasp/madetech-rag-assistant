@@ -11,7 +11,9 @@ Run from repo root:
     uvicorn backend.src.app:app --reload --port 9481
 """
 
+import asyncio
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import date
@@ -21,6 +23,8 @@ from agents import Agent, Runner, function_tool, RunContextWrapper, OpenAIChatCo
 from agents.stream_events import RunItemStreamEvent
 from openai import AsyncOpenAI, OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+logger = logging.getLogger(__name__)
 
 # Async Groq client — lazily initialized on first use (after dotenv loads).
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
@@ -307,6 +311,10 @@ async def answer_question_agent(
     return result.final_output, rag_context.retrieved_chunks, tool_steps
 
 
+_STREAM_MAX_ATTEMPTS = 3
+_STREAM_RETRY_BASE_DELAY = 5
+
+
 async def answer_question_agent_streamed(
     question: str,
     history: list[dict] | None = None,
@@ -317,11 +325,13 @@ async def answer_question_agent_streamed(
     """
     Async generator that yields SSE events as the agent processes the query.
 
+    Retries up to 3 times on transient failures (matching the non-streaming
+    path). Once tool_step events have been yielded to the caller, retrying
+    is not possible so the error is surfaced immediately.
+
     Yields dicts with "event" and "data" keys:
     - {"event": "tool_step", "data": {"tool_name": ..., "arguments": ..., "order": ...}}
     - {"event": "done", "data": {"content": ..., "sources": [...], "tool_steps": [...]}}
-
-    The caller is responsible for formatting these as SSE.
     """
     if history is None:
         history = []
@@ -331,13 +341,6 @@ async def answer_question_agent_streamed(
         openai_client = OpenAI()
     if collection is None:
         raise ValueError("collection is required")
-
-    rag_context = RAGContext(
-        collection=collection,
-        openai_client=openai_client,
-        config=config,
-        history=history,
-    )
 
     agent = _build_agent(config)
 
@@ -349,60 +352,81 @@ async def answer_question_agent_streamed(
             input_messages.append({"role": role, "content": content})
     input_messages.append({"role": "user", "content": question})
 
-    result = Runner.run_streamed(
-        agent,
-        input=input_messages,
-        context=rag_context,
-        max_turns=6,
-    )
+    for attempt in range(1, _STREAM_MAX_ATTEMPTS + 1):
+        rag_context = RAGContext(
+            collection=collection,
+            openai_client=openai_client,
+            config=config,
+            history=history,
+        )
 
-    tool_order = 0
-    try:
-        async for event in result.stream_events():
-            if (
-                isinstance(event, RunItemStreamEvent)
-                and event.name == "tool_called"
-            ):
-                try:
-                    raw = event.item.raw_item
-                    tool_name = getattr(raw, "name", "unknown")
-                    arguments_str = getattr(raw, "arguments", "{}")
+        result = Runner.run_streamed(
+            agent,
+            input=input_messages,
+            context=rag_context,
+            max_turns=6,
+        )
+
+        tool_order = 0
+        has_yielded = False
+        try:
+            async for event in result.stream_events():
+                if (
+                    isinstance(event, RunItemStreamEvent)
+                    and event.name == "tool_called"
+                ):
                     try:
-                        arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
-                    except (json.JSONDecodeError, TypeError):
-                        arguments = {}
+                        raw = event.item.raw_item
+                        tool_name = getattr(raw, "name", "unknown")
+                        arguments_str = getattr(raw, "arguments", "{}")
+                        try:
+                            arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
+                        except (json.JSONDecodeError, TypeError):
+                            arguments = {}
 
-                    tool_order += 1
-                    yield {
-                        "event": "tool_step",
-                        "data": {
-                            "tool_name": tool_name,
-                            "arguments": arguments,
-                            "order": tool_order,
-                        },
-                    }
-                except Exception:
-                    pass  # Skip malformed tool call events
+                        tool_order += 1
+                        has_yielded = True
+                        yield {
+                            "event": "tool_step",
+                            "data": {
+                                "tool_name": tool_name,
+                                "arguments": arguments,
+                                "order": tool_order,
+                            },
+                        }
+                    except Exception:
+                        pass
 
-        # After streaming completes, extract final results
-        tool_steps = _extract_tool_steps(result)
-        yield {
-            "event": "done",
-            "data": {
-                "content": result.final_output,
-                "chunks": rag_context.retrieved_chunks,
-                "tool_steps": tool_steps,
-            },
-        }
-    except Exception as e:
-        # If streaming fails mid-way, try to get whatever result is available
-        print(f"Stream event error: {e}")
-        content = getattr(result, "final_output", None) or "I encountered an issue processing your request. Please try again."
-        yield {
-            "event": "done",
-            "data": {
-                "content": content,
-                "chunks": rag_context.retrieved_chunks,
-                "tool_steps": [],
-            },
-        }
+            tool_steps = _extract_tool_steps(result)
+            yield {
+                "event": "done",
+                "data": {
+                    "content": result.final_output,
+                    "chunks": rag_context.retrieved_chunks,
+                    "tool_steps": tool_steps,
+                },
+            }
+            return
+        except Exception as e:
+            is_last_attempt = attempt == _STREAM_MAX_ATTEMPTS
+
+            if has_yielded or is_last_attempt:
+                logger.error("Stream failed (attempt %d/%d, %s): %s",
+                             attempt, _STREAM_MAX_ATTEMPTS, type(e).__name__, e)
+                content = getattr(result, "final_output", None) or \
+                    "I encountered an issue processing your request. Please try again."
+                yield {
+                    "event": "done",
+                    "data": {
+                        "content": content,
+                        "chunks": rag_context.retrieved_chunks,
+                        "tool_steps": [],
+                        "isError": True,
+                    },
+                }
+                return
+
+            delay = _STREAM_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+            logger.warning("Stream attempt %d/%d failed (%s: %s), retrying in %ds...",
+                           attempt, _STREAM_MAX_ATTEMPTS, type(e).__name__, e, delay)
+            await asyncio.sleep(delay)

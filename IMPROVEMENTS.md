@@ -62,6 +62,14 @@
 
 ## What's Next — Actionable Items for Future Sessions
 
+### 4.0 Bug Fixes (High Priority)
+
+- [x] **[CURSOR]** **Mobile: scroll position not reset on new chat** — on iPhone/iPad, creating a new chat from an active session leaves the scroll position mid-page; the welcome screen (sample questions, FAQ) is rendered but not visible until the user scrolls up. Fixed: auto-scroll effect in `ChatArea.tsx` now scrolls to top (with `behavior: 'instant'` + `requestAnimationFrame`) when messages are empty, and to bottom when messages are present.
+- [x] **[CURSOR]** **Investigate frequent retry failures** — root cause: `handleRetry` used the non-streaming endpoint (3 backend retries) while `handleSend` used streaming (zero retries), causing ~40% first-query failures. Fixed: (1) 3-attempt retry in `answer_question_agent_streamed`, (2) `handleRetry` switched to streaming, (3) **3-attempt silent frontend retry** in both `handleSend` and `handleRetry` — error message only shown after all attempts fail, (4) error messages cleared when user sends a new message, (5) `config_loader.py` bug where `use_keyword_search` was not merged from `approach` section — BM25 hybrid search was silently disabled.
+- [x] **[CURSOR]** **Streaming response bleeds into a newly created chat** — if a query is in-flight (SSE stream active) and the user opens a new chat, streamed tokens/tool-step events from the previous query appear in the new chat. Fixed: guarded `onToolStep` callback with chat ID check and clear `liveToolSteps` on chat switch. In-flight queries now complete in the background and notify via the unread indicator instead of being aborted.
+
+---
+
 ### 4.1 Content & Articles
 
 - [ ] **[MANUAL]** Write a blog post / case study about the project. Lead with the user problem (nobody reads HR docs), then the solution. Include the problem statement from the welcome modal as a starting point.
@@ -85,7 +93,15 @@
 - [ ] **[COLLAB]** Add cost monitoring: log token counts per request to Supabase. Not needed while $5/month caps are in place — revisit if budget increases.
 - [ ] **[COLLAB]** Add article/resource links in the app UI: blocked until articles are written.
 
-### 4.5 Potential Improvements (Not Yet Planned)
+### 4.5 Evaluation & Testing
+
+- [ ] **[CURSOR]** **Batch evaluation script** — write a Python script (e.g. `backend/scripts/evaluate.py`) that reads a validation set (question + expected answer / expected sources), sends each question to the `/api/chat` endpoint (or calls `agent_pipeline.py` directly), and records the response. Output a summary table: question, response, latency, sources retrieved, pass/fail.
+- [ ] **[CURSOR]** **Config flag toggles in evaluation** — expose CLI arguments (or a separate `eval_config.yaml`) that mirror the existing `config.yaml` pipeline flags (`use_query_rewriting`, `use_reranking`, `use_keyword_search`). This lets a single evaluation run compare different pipeline configurations side-by-side without changing production config.
+- [ ] **[CURSOR]** **Scoring** — at minimum, log whether the expected source document appeared in the retrieved chunks (recall@k). Optionally add an LLM-as-judge step to rate answer quality (1–5) against the expected answer. Keep scoring optional so the script is useful even without ground-truth answers.
+- [ ] **[MANUAL]** Review the existing validation set in `backend/` (notebooks / test data) to confirm it is still representative of real user queries before running a full evaluation.
+- [ ] **[COLLAB]** Once evaluation results exist, surface key metrics in the README and use them to justify any future pipeline changes.
+
+### 4.7 Potential Improvements (Not Yet Planned)
 
 - [ ] **Streaming answer text**: currently the full answer arrives at once after tool steps stream. Could stream the answer text token-by-token for even better UX.
 - [ ] **Experiment with tool configurations**: add/remove tools and test behavior. Investigate if SDK tool descriptions are sufficient without explicit system prompt guidance.

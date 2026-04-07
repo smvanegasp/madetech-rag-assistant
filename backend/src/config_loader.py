@@ -60,6 +60,7 @@ def load_config(config_path: Path | str | None = None) -> dict:
     approach = config.get("approach") or {}
     config["use_query_rewriting"] = approach.get("use_query_rewriting", False)
     config["use_reranking"] = approach.get("use_reranking", False)
+    config["use_keyword_search"] = approach.get("use_keyword_search", False)
 
     # Ensure retrieval, embedding_model, model have defaults
     config.setdefault("retrieval", {})

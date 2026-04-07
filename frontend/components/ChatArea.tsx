@@ -149,12 +149,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     el.style.height = desired + 'px';
   }, [inputValue]);
 
-  /**
-   * Effect: Automatically scrolls the chat window to the bottom whenever
-   * messages are updated or the loading state changes.
-   */
   useEffect(() => {
-    if (scrollRef.current) {
+    if (!scrollRef.current) return;
+    if (messages.length === 0) {
+      // New chat: snap to top instantly, bypassing scroll-smooth for iOS
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      });
+    } else {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
@@ -227,11 +229,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     if (items.length === 0) return null;
 
     return (
-      <div className={`mb-3 text-xs rounded-lg border px-3 py-2.5 ${
-        isDark
-          ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
-          : 'border-zinc-100 bg-zinc-50 text-zinc-400'
-      }`}>
+      <div className={`mb-3 text-xs rounded-lg border px-3 py-2.5 ${isDark
+        ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
+        : 'border-zinc-100 bg-zinc-50 text-zinc-400'
+        }`}>
         <div className="space-y-1">
           {items.map((item, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -419,13 +420,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 >
                   {message.role === 'assistant' ? (
                     <>
-                    {renderToolSteps(message)}
-                    <MarkdownRenderer
-                      content={message.content}
-                      theme={theme}
-                      sources={message.sources}
-                      onCiteClick={message.sources ? (docId) => onOpenSource(message.sources!, docId, message.id) : undefined}
-                    />
+                      {renderToolSteps(message)}
+                      <MarkdownRenderer
+                        content={message.content}
+                        theme={theme}
+                        sources={message.sources}
+                        onCiteClick={message.sources ? (docId) => onOpenSource(message.sources!, docId, message.id) : undefined}
+                      />
                     </>
                   ) : (
                     <p>{message.content}</p>
@@ -458,9 +459,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
                 </div>
                 {liveToolSteps.length > 0 && (
-                  <div className={`ml-11 text-xs rounded-lg border px-3 py-2.5 space-y-1 ${
-                    isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500' : 'border-zinc-100 bg-zinc-50 text-zinc-400'
-                  }`}>
+                  <div className={`ml-11 text-xs rounded-lg border px-3 py-2.5 space-y-1 ${isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-500' : 'border-zinc-100 bg-zinc-50 text-zinc-400'
+                    }`}>
                     {expandToolSteps(liveToolSteps).map((item, i, arr) => (
                       <div key={i} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
                         {i < arr.length - 1 ? (

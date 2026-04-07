@@ -24,7 +24,7 @@ import SourceViewer from './components/SourceViewer';
 import WelcomeModal from './components/WelcomeModal';
 import ContactModal from './components/ContactModal';
 import { Chat, Message, SourceChunk, ToolStep, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
-import { getHandbookResponse, getHandbookResponseStreamed, getHandbookDocs } from './services/apiService';
+import { getHandbookResponseStreamed, getHandbookDocs } from './services/apiService';
 import { PanelRight, MessageCircleHeart } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -65,6 +65,7 @@ const App: React.FC = () => {
   
   useEffect(() => {
     currentChatIdRef.current = currentChatId;
+    setLiveToolSteps([]);
     if (currentChatId) {
       setChats(prev => prev.map(c => 
         c.id === currentChatId ? { ...c, hasUnreadResponse: false } : c
@@ -87,6 +88,8 @@ const App: React.FC = () => {
   }, [theme]);
 
   const handleNewChat = useCallback(() => {
+    setLiveToolSteps([]);
+
     const id = Math.random().toString(36).substring(7);
     const newChat: Chat = {
       id,
@@ -138,6 +141,8 @@ const App: React.FC = () => {
    * The unread notification system tracks responses that arrive while the user
    * is viewing a different chat, allowing them to return later.
    */
+  const MAX_ATTEMPTS = 3;
+
   const handleSend = async (retryQuery?: string) => {
     const isRetry = typeof retryQuery === 'string' && retryQuery.length > 0;
     const query = isRetry ? retryQuery : inputValue.trim();
@@ -163,7 +168,7 @@ const App: React.FC = () => {
 
         return { 
           ...chat, 
-          messages: [...chat.messages, userMessage],
+          messages: [...chat.messages.filter(m => !m.isError), userMessage],
           title: newTitle,
           isLoading: true
         };
@@ -171,61 +176,81 @@ const App: React.FC = () => {
       return chat;
     }));
 
-    try {
-      setLiveToolSteps([]);
-      const response = await getHandbookResponseStreamed(
-        userQuery,
-        currentChat?.messages || [],
-        currentChat?.dbChatId,
-        (step) => {
-          // Deduplicate: skip if same tool+query already shown
-          const key = `${step.tool_name}:${JSON.stringify(step.arguments)}`;
-          setLiveToolSteps(prev => {
-            if (prev.some(s => `${s.tool_name}:${JSON.stringify(s.arguments)}` === key)) return prev;
-            return [...prev, step];
-          });
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        setLiveToolSteps([]);
+        const response = await getHandbookResponseStreamed(
+          userQuery,
+          currentChat?.messages || [],
+          currentChat?.dbChatId,
+          (step) => {
+            if (currentChatIdRef.current !== activeChatId) return;
+            const key = `${step.tool_name}:${JSON.stringify(step.arguments)}`;
+            setLiveToolSteps(prev => {
+              if (prev.some(s => `${s.tool_name}:${JSON.stringify(s.arguments)}` === key)) return prev;
+              return [...prev, step];
+            });
+          },
+        );
+
+        if (!response.isError) {
+          const assistantMessage: Message = {
+            id: Math.random().toString(36).substring(7),
+            role: 'assistant',
+            content: response.content,
+            sources: response.sources,
+            toolSteps: response.tool_steps ?? undefined,
+            timestamp: new Date(),
+            isError: false,
+          };
+
+          setLiveToolSteps([]);
+          setChats(prev => prev.map(chat => {
+            if (chat.id === activeChatId) {
+              const isBackground = currentChatIdRef.current !== activeChatId;
+              return {
+                ...chat,
+                messages: [...chat.messages, assistantMessage],
+                updatedAt: new Date(),
+                isLoading: false,
+                hasUnreadResponse: isBackground,
+                dbChatId: chat.dbChatId ?? response.chat_id ?? undefined,
+              };
+            }
+            return chat;
+          }));
+          return;
         }
-      );
-      const assistantMessageId = Math.random().toString(36).substring(7);
-      
-      const assistantMessage: Message = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: response.content,
-        sources: response.sources,
-        toolSteps: response.tool_steps ?? undefined,
-        timestamp: new Date(),
-        isError: response.isError || false,
-      };
 
-      setLiveToolSteps([]);
-      setChats(prev => prev.map(chat => {
-          if (chat.id === activeChatId) {
-            const isBackground = currentChatIdRef.current !== activeChatId;
-            return {
-              ...chat,
-              messages: [...chat.messages, assistantMessage],
-              updatedAt: new Date(),
-              isLoading: false,
-              hasUnreadResponse: isBackground,
-              dbChatId: chat.dbChatId ?? response.chat_id ?? undefined,
-            };
-          }
-          return chat;
-      }));
-
-    } catch (err) {
-      console.error("Critical AI Communication Error:", err);
-      const errorMessage: Message = {
-        id: Math.random().toString(36).substring(7),
-        role: 'assistant',
-        content: "I'm having trouble connecting right now. Please check your connection and try again.",
-        timestamp: new Date(),
-        isError: true,
-      };
-      setChats(prev => prev.map(chat =>
-        chat.id === activeChatId ? { ...chat, messages: [...chat.messages, errorMessage], isLoading: false } : chat
-      ));
+        if (attempt === MAX_ATTEMPTS) {
+          const errorMessage: Message = {
+            id: Math.random().toString(36).substring(7),
+            role: 'assistant',
+            content: response.content || "I'm having trouble connecting right now. Please try again.",
+            timestamp: new Date(),
+            isError: true,
+          };
+          setLiveToolSteps([]);
+          setChats(prev => prev.map(chat =>
+            chat.id === activeChatId ? { ...chat, messages: [...chat.messages, errorMessage], isLoading: false } : chat
+          ));
+        }
+      } catch (err) {
+        if (attempt === MAX_ATTEMPTS) {
+          console.error("All retry attempts failed:", err);
+          const errorMessage: Message = {
+            id: Math.random().toString(36).substring(7),
+            role: 'assistant',
+            content: "I'm having trouble connecting right now. Please check your connection and try again.",
+            timestamp: new Date(),
+            isError: true,
+          };
+          setLiveToolSteps([]);
+          setChats(prev => prev.map(chat =>
+            chat.id === activeChatId ? { ...chat, messages: [...chat.messages, errorMessage], isLoading: false } : chat
+          ));
+        }
+      }
     }
   };
 
@@ -236,50 +261,86 @@ const App: React.FC = () => {
     const lastUserMsg = [...chat.messages].reverse().find(m => m.role === 'user');
     if (!lastUserMsg) return;
     const activeChatId = currentChatId;
+    const messagesWithoutError = chat.messages.filter(m => !m.isError);
 
-    // Remove error messages and set loading
     setChats(prev => prev.map(c =>
-      c.id === activeChatId ? { ...c, messages: c.messages.filter(m => !m.isError), isLoading: true } : c
+      c.id === activeChatId ? { ...c, messages: messagesWithoutError, isLoading: true } : c
     ));
 
-    try {
-      const messagesWithoutError = chat.messages.filter(m => !m.isError);
-      const response = await getHandbookResponse(lastUserMsg.content, messagesWithoutError, chat.dbChatId);
-      const assistantMessage: Message = {
-        id: Math.random().toString(36).substring(7),
-        role: 'assistant',
-        content: response.content,
-        sources: response.sources,
-        toolSteps: response.tool_steps ?? undefined,
-        timestamp: new Date(),
-        isError: response.isError || false,
-      };
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          const isBackground = currentChatIdRef.current !== activeChatId;
-          return {
-            ...c,
-            messages: [...c.messages.filter(m => !m.isError), assistantMessage],
-            updatedAt: new Date(),
-            isLoading: false,
-            hasUnreadResponse: isBackground,
-            dbChatId: c.dbChatId ?? response.chat_id ?? undefined,
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        setLiveToolSteps([]);
+        const response = await getHandbookResponseStreamed(
+          lastUserMsg.content,
+          messagesWithoutError,
+          chat.dbChatId,
+          (step) => {
+            if (currentChatIdRef.current !== activeChatId) return;
+            const key = `${step.tool_name}:${JSON.stringify(step.arguments)}`;
+            setLiveToolSteps(prev => {
+              if (prev.some(s => `${s.tool_name}:${JSON.stringify(s.arguments)}` === key)) return prev;
+              return [...prev, step];
+            });
+          },
+        );
+
+        if (!response.isError) {
+          const assistantMessage: Message = {
+            id: Math.random().toString(36).substring(7),
+            role: 'assistant',
+            content: response.content,
+            sources: response.sources,
+            toolSteps: response.tool_steps ?? undefined,
+            timestamp: new Date(),
+            isError: false,
           };
+          setLiveToolSteps([]);
+          setChats(prev => prev.map(c => {
+            if (c.id === activeChatId) {
+              const isBackground = currentChatIdRef.current !== activeChatId;
+              return {
+                ...c,
+                messages: [...c.messages.filter(m => !m.isError), assistantMessage],
+                updatedAt: new Date(),
+                isLoading: false,
+                hasUnreadResponse: isBackground,
+                dbChatId: c.dbChatId ?? response.chat_id ?? undefined,
+              };
+            }
+            return c;
+          }));
+          return;
         }
-        return c;
-      }));
-    } catch (err) {
-      console.error("Retry failed:", err);
-      const errorMessage: Message = {
-        id: Math.random().toString(36).substring(7),
-        role: 'assistant',
-        content: "I'm having trouble connecting right now. Please check your connection and try again.",
-        timestamp: new Date(),
-        isError: true,
-      };
-      setChats(prev => prev.map(c =>
-        c.id === activeChatId ? { ...c, messages: [...c.messages.filter(m => !m.isError), errorMessage], isLoading: false } : c
-      ));
+
+        if (attempt === MAX_ATTEMPTS) {
+          const errorMessage: Message = {
+            id: Math.random().toString(36).substring(7),
+            role: 'assistant',
+            content: response.content || "I'm having trouble connecting right now. Please try again.",
+            timestamp: new Date(),
+            isError: true,
+          };
+          setLiveToolSteps([]);
+          setChats(prev => prev.map(c =>
+            c.id === activeChatId ? { ...c, messages: [...c.messages.filter(m => !m.isError), errorMessage], isLoading: false } : c
+          ));
+        }
+      } catch (err) {
+        if (attempt === MAX_ATTEMPTS) {
+          console.error("All retry attempts failed:", err);
+          const errorMessage: Message = {
+            id: Math.random().toString(36).substring(7),
+            role: 'assistant',
+            content: "I'm having trouble connecting right now. Please check your connection and try again.",
+            timestamp: new Date(),
+            isError: true,
+          };
+          setLiveToolSteps([]);
+          setChats(prev => prev.map(c =>
+            c.id === activeChatId ? { ...c, messages: [...c.messages.filter(m => !m.isError), errorMessage], isLoading: false } : c
+          ));
+        }
+      }
     }
   }, [currentChatId, chats]);
 
