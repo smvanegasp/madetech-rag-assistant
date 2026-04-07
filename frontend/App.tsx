@@ -178,7 +178,7 @@ const App: React.FC = () => {
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        setLiveToolSteps([]);
+        if (attempt === 1) setLiveToolSteps([]);
         const response = await getHandbookResponseStreamed(
           userQuery,
           currentChat?.messages || [],
@@ -269,7 +269,7 @@ const App: React.FC = () => {
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        setLiveToolSteps([]);
+        if (attempt === 1) setLiveToolSteps([]);
         const response = await getHandbookResponseStreamed(
           lastUserMsg.content,
           messagesWithoutError,
