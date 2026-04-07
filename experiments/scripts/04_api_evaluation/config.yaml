@@ -1,0 +1,45 @@
+# API Evaluation experiment configuration
+# Tests the live RAG API endpoint and scores answers with LLM-as-judge
+# Uses questions from 00_questions_generation output
+
+# API connection
+api:
+  base_url: "http://localhost:9481"
+  endpoint: "/api/chat"
+  timeout_seconds: 120
+
+# Path to questions — "latest" uses the most recent timestamp folder
+questions:
+  source: "../00_questions_generation/output"
+  use_latest: true
+  # Or specify a timestamp explicitly:
+  # timestamp: "2026-03-05_07-47-14"
+  files:
+    - "validation.jsonl"   # Swap to "test.jsonl" for test set evaluation
+  n_questions: null        # null = use all questions; int = random sample
+  random_seed: 42          # For reproducible sampling when n_questions is set
+
+# LLM for the judge evaluation (scores accuracy, completeness, relevance)
+judge_model: "groq/llama-3.3-70b-versatile"
+
+# Label for this run — describes the current API configuration being tested
+# Change this when you change backend/config.yaml to keep runs distinguishable
+experiment_name: "api_baseline"
+
+# Parallel workers for question evaluation (1 = sequential)
+workers: 3
+
+# Output directory for results (relative to this script)
+output: "output"
+
+# Optional: load previous run instead of re-running (path to timestamp folder)
+# e.g. "output/2026-04-07_12-00-00" (null = run from scratch)
+load_from: null
+
+# Generate plots after run
+save_plots: true
+
+# Compare with previous runs — list of paths to previous output dirs
+# Generates cross-run comparison plots (scores + latency side by side)
+# e.g. ["output/2026-04-07_12-00-00", "output/2026-04-07_13-00-00"]
+compare_with: []
