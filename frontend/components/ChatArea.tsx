@@ -106,7 +106,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     "What should I do if frustration starts during mentoring?",
     "How can a mentee use coding katas in mentorship?",
     "What core values are highlighted across Made Tech roles?",
-    "What is the salary range for a Designer?",
     "When is the next ISO 27001 review?",
     "Where does Made Tech backup my data?",
     "What KPIs do Delivery Managers track?",

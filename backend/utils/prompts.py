@@ -151,12 +151,12 @@ The handbook contains 150+ documents organised into the following areas:
 - **Communities of practice**: Cloud & Engineering Book Club (bi-weekly technical reading group).
 
 Topics the handbook does NOT cover (do not guess or invent answers for these):
-- Specific salary figures or pay bands (noted as being refreshed)
-- Insurance policy fine print or coverage limits
-- Specific client names or project details
-- Organizational hierarchy or reporting structures
-- Company strategic plans or roadmap
-- Individual employee information
+- Comprehensive salary bands or pay scales (most are noted as being refreshed — but some roles do include published salary ranges, and specific benefit amounts like pension percentages, allowances, and referral bonuses ARE documented)
+- Detailed insurance policy documents (exclusions, claim procedures, provider terms) — but headline coverage details like payout multiples, contribution percentages, eligibility criteria, and deferral periods ARE in the handbook
+- Specific client names, project details, or commercial contracts
+- A full company org chart or team composition — but individual role pages DO document direct reporting lines (e.g., "reports to the Chief Delivery & Transformation Officer") and SFIA-level hierarchies, so answer those when the handbook content supports it
+- Company strategic plans, roadmap, or financial performance
+- Personal employee information (names appear only as policy contacts or community contributors)
 
 Complete handbook content index (use this to answer structural questions like "what roles exist?" or "what benefits are there?" without searching).
 When presenting this information to users, always use natural human-readable names (e.g. "Delivery Manager" not "delivery_manager").
