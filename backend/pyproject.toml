@@ -13,7 +13,7 @@ dependencies = [
     # faster Lambda cold starts). The server side is Chroma Cloud.
     "chromadb-client>=1.5.4",
     # 2.x is what the app was built and tuned against; 3.x is a major upgrade to test on purpose.
-    "openai>=2.26.0,<3",
+    "openai>=2.26.0,<4",
     "litellm>=1.0.0",
     "openai-agents[litellm]>=0.1.0",
     "tenacity>=8.0.0",
