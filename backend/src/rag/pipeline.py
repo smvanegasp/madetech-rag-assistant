@@ -13,15 +13,24 @@ The LLM decides whether to call the handbook search tool (RAG) or answer directl
 import json
 from datetime import date
 
-from litellm import completion
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from utils.models import Result
 from utils.prompts import RAG_SYSTEM_PROMPT, TOOL_DECISION_SYSTEM_PROMPT
 
 from .query_rewriting import rewrite_query
 from .reranking import merge_chunks, rerank
 from .retrieval import fetch_context_unranked
+
+
+def completion(*args, **kwargs):
+    """litellm.completion, imported on first use: importing litellm takes seconds, which every
+    Lambda cold start would pay although the agent (agent_pipeline.py) only uses fetch_context."""
+    from litellm import completion as litellm_completion
+
+    return litellm_completion(*args, **kwargs)
+
 
 SEARCH_HANDBOOK_TOOL = {
     "type": "function",
@@ -134,7 +143,9 @@ def make_rag_messages(
     User messages: conversation history + current question.
     """
     context = _format_context(chunks)
-    system_prompt = RAG_SYSTEM_PROMPT.format(context=context, today=date.today().strftime("%B %d, %Y"))
+    system_prompt = RAG_SYSTEM_PROMPT.format(
+        context=context, today=date.today().strftime("%B %d, %Y")
+    )
     return (
         [{"role": "system", "content": system_prompt}]
         + history
@@ -201,15 +212,20 @@ def answer_question(
     if openai_client is None:
         openai_client = OpenAI()
     if collection is None:
-        raise ValueError(
-            "collection is required; use get_chroma_collection() to obtain it"
-        )
+        raise ValueError("collection is required; use get_chroma_collection() to obtain it")
 
     model = config.get("model", "groq/openai/gpt-oss-20b")
 
     # Phase 1: let the LLM decide whether to search the handbook.
     phase1_messages = (
-        [{"role": "system", "content": TOOL_DECISION_SYSTEM_PROMPT.format(today=date.today().strftime("%B %d, %Y"))}]
+        [
+            {
+                "role": "system",
+                "content": TOOL_DECISION_SYSTEM_PROMPT.format(
+                    today=date.today().strftime("%B %d, %Y")
+                ),
+            }
+        ]
         + history
         + [{"role": "user", "content": question}]
     )
@@ -233,7 +249,9 @@ def answer_question(
     )
 
     context = _format_context(chunks)
-    system_prompt = RAG_SYSTEM_PROMPT.format(context=context, today=date.today().strftime("%B %d, %Y"))
+    system_prompt = RAG_SYSTEM_PROMPT.format(
+        context=context, today=date.today().strftime("%B %d, %Y")
+    )
 
     # Reconstruct full message thread: system + history + user + assistant
     # (with tool call) + tool result, then generate the final answer.

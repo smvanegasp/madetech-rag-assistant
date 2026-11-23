@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      # Offline: a fake RAG service and moto's in-memory DynamoDB; no model or Chroma calls.
+      - run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The "lambda" stage pulls from public ECR, which rate-limits shared CI runners;
+      # it is built at deploy time instead.
+      - run: docker build --target app ./backend
+
+  # The repo is public: fail the build if a key, token or password ever lands in a commit.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - run: terraform fmt -check -recursive infra
+      # No backend or AWS credentials in CI: this only checks the configuration.
+      - run: terraform -chdir=infra init -backend=false -input=false
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra/bootstrap init -backend=false -input=false
+      - run: terraform -chdir=infra/bootstrap validate
+
+  # What merging this PR would change in AWS, shown in the job summary. Read-only role, no state
+  # lock. Skipped for PRs that can't get AWS credentials (forks, Dependabot) and until
+  # DEPLOY_ENABLED is on (the role only exists after the first deploy).
+  infra-plan:
+    if: >-
+      github.event_name == 'pull_request' && vars.DEPLOY_ENABLED == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::816940506502:role/nexus-github-plan
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - run: terraform -chdir=infra init -input=false
+      # The image digest is whatever :latest is now; a merge pushes a new one, so a change to the
+      # Lambda image always shows up here (expected).
+      - name: Terraform plan
+        run: |
+          terraform -chdir=infra plan -input=false -lock=false -no-color | tee plan.txt
+          {
+            echo '### Terraform plan'
+            echo '```'
+            grep -E '^\s+# |^Plan:|^No changes' plan.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

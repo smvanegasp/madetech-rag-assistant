@@ -1,13 +1,12 @@
 import os
 from pathlib import Path
-from typing import List
 
 import yaml
 
 from .models import HandbookDoc
 
 
-def load_handbook_documents(handbook_dir: Path) -> List[HandbookDoc]:
+def load_handbook_documents(handbook_dir: Path) -> list[HandbookDoc]:
     """
     Load all handbook documents from the data/handbook directory recursively.
 
@@ -50,7 +49,7 @@ def load_handbook_documents(handbook_dir: Path) -> List[HandbookDoc]:
     for md_file in md_files:
         try:
             # Read file with BOM handling (some editors add UTF-8 BOM)
-            with open(md_file, "r", encoding="utf-8-sig") as f:
+            with open(md_file, encoding="utf-8-sig") as f:
                 content = f.read()
 
             # Calculate relative path from handbook directory
@@ -59,9 +58,7 @@ def load_handbook_documents(handbook_dir: Path) -> List[HandbookDoc]:
 
             # Extract category from folder structure
             # Example: benefits/vacation_policy.md → "Benefits"
-            category = (
-                relative_path.parts[0] if len(relative_path.parts) > 1 else "General"
-            )
+            category = relative_path.parts[0] if len(relative_path.parts) > 1 else "General"
             # Convert to title case: "it-security" → "It Security"
             category = category.replace("_", " ").replace("-", " ").title()
 
@@ -92,9 +89,7 @@ def load_handbook_documents(handbook_dir: Path) -> List[HandbookDoc]:
                             title = frontmatter.get("title", title)
                             category = frontmatter.get("category", category)
                     except yaml.YAMLError as e:
-                        print(
-                            f"Warning: Invalid YAML frontmatter in {relative_path}: {e}"
-                        )
+                        print(f"Warning: Invalid YAML frontmatter in {relative_path}: {e}")
                         # Content is already stripped above, so we continue
                         # with default metadata
 
@@ -108,9 +103,7 @@ def load_handbook_documents(handbook_dir: Path) -> List[HandbookDoc]:
                         break
 
             # Create HandbookDoc object
-            doc = HandbookDoc(
-                id=doc_id, title=title, category=category, content=markdown_content
-            )
+            doc = HandbookDoc(id=doc_id, title=title, category=category, content=markdown_content)
             documents.append(doc)
 
         except Exception as e:

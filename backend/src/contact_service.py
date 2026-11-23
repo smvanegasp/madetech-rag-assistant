@@ -5,6 +5,7 @@ Errors are raised so the /api/contact endpoint can return a meaningful HTTP erro
 """
 
 import os
+
 import resend
 
 
@@ -57,10 +58,12 @@ def send_contact_email(
     </div>
     """
 
-    resend.Emails.send({
-        "from": "onboarding@resend.dev",
-        "to": [to_email.strip()],
-        "subject": subject,
-        "html": html_body,
-        "reply_to": [email],
-    })
+    resend.Emails.send(
+        {
+            "from": "onboarding@resend.dev",
+            "to": [to_email.strip()],
+            "subject": subject,
+            "html": html_body,
+            "reply_to": [email],
+        }
+    )

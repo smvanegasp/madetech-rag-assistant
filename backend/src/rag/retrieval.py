@@ -56,6 +56,6 @@ def fetch_context_unranked(
     )
 
     chunks = []
-    for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+    for doc, meta in zip(results["documents"][0], results["metadatas"][0], strict=False):
         chunks.append(Result(page_content=doc, metadata=meta))
     return chunks

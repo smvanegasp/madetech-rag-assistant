@@ -2,29 +2,36 @@
 name = "rag-handbook-backend"
 version = "0.1.0"
 description = "FastAPI backend for RAG Company Handbook"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "pydantic>=2.10.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
-    "langchain>=0.3.0",
-    "langchain-core>=0.3.0",
-    "langchain-openai>=0.2.0",
-    "langchain-chroma>=0.1.0",
-    "langchain-community>=0.3.0",
-    "langchain-text-splitters>=0.3.0",
-    "langchain-experimental>=0.3.0",
-    "chromadb>=0.5.0",
-    "openai>=1.0.0",
+    # The thin HTTP client: CloudClient without the local database engine (smaller image,
+    # faster Lambda cold starts). The server side is Chroma Cloud.
+    "chromadb-client>=1.5.4",
+    # 2.x is what the app was built and tuned against; 3.x is a major upgrade to test on purpose.
+    "openai>=2.26.0,<3",
     "litellm>=1.0.0",
     "openai-agents[litellm]>=0.1.0",
     "tenacity>=8.0.0",
     "rank-bm25>=0.2.2",
-    "tqdm>=4.0.0",
-    "psycopg2-binary>=2.9.0",
     "resend>=2.26.0",
+    "boto3>=1.40.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.28",
+    "moto[dynamodb,ssm]>=5.1",
+    "ruff>=0.14",
+]
+# Only for re-ingesting the handbook into Chroma (scripts/01_llm_chunking_embedding).
+ingest = [
+    "tqdm>=4.0.0",
 ]
 
 [build-system]
@@ -33,3 +40,17 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src", "utils"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# The formatter handles code; long lines left are prompt text and docstrings.
+ignore = ["E501"]

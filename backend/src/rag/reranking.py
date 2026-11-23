@@ -4,12 +4,19 @@ LLM reranking — reorder retrieved chunks by relevance to the question.
 ChromaDB returns cosine-similar chunks; this step lets an LLM refine the order.
 """
 
-from litellm import completion
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.models import Result
 from utils.prompts import RERANK_CHUNKS_SYSTEM_PROMPT
+
+
+def completion(*args, **kwargs):
+    """litellm.completion, imported on first use: importing litellm takes seconds, which every
+    Lambda cold start would pay even with this feature off (config.yaml approach flags)."""
+    from litellm import completion as litellm_completion
+
+    return litellm_completion(*args, **kwargs)
 
 
 class RankOrder(BaseModel):
@@ -74,7 +81,7 @@ def rerank(question: str, chunks: list[Result], model: str) -> list[Result]:
     user_prompt += "Here are the chunks:\n\n"
     for index, chunk in enumerate(chunks):
         user_prompt += f"# CHUNK ID: {index + 1}:\n\n{chunk.page_content}\n\n"
-    user_prompt += f"Reply with valid JSON only: {{\"order\": [a, b, c, ...]}} with {n} comma-separated integers."
+    user_prompt += f'Reply with valid JSON only: {{"order": [a, b, c, ...]}} with {n} comma-separated integers.'
 
     response = completion(
         model=model,

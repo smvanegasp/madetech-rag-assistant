@@ -59,7 +59,7 @@ flowchart TB
     T2 --> FC
     T3 --> Contact["contact_service.py\n(Resend email)"]
     T4 --> Contact
-    Routes -.-> Logger["chat_logger.py\n(Supabase)"]
+    Routes -.-> Logger["chat_logger.py\n(DynamoDB)"]
 ```
 
 ## Directory Structure
@@ -73,7 +73,7 @@ backend/
 │   ├── config_loader.py         # Load and resolve config.yaml
 │   ├── rag_service.py           # RAG orchestration, BM25 index init, source extraction
 │   ├── handbook_loader.py       # Load .md files → HandbookDoc objects
-│   ├── chat_logger.py           # Async chat logging to Supabase PostgreSQL
+│   ├── chat_logger.py           # Chat logs to DynamoDB (off without TABLE_NAME)
 │   ├── contact_service.py       # Feedback/contact emails via Resend
 │   └── rag/                     # RAG pipeline modules
 │       ├── agent_pipeline.py    # OpenAI Agents SDK: agent, tools, streaming
@@ -122,7 +122,7 @@ sequenceDiagram
     S->>S: extract_sources(chunks)
     S-->>A: content + sources + tool_steps
     A-->>F: SSE: done event
-    A->>A: log to Supabase (async)
+    A->>A: log to DynamoDB
 ```
 
 ### Non-streaming Chat (`POST /api/chat`)
@@ -177,7 +177,6 @@ The `TOOL_DECISION_SYSTEM_PROMPT` in `utils/prompts.py` contains:
 | `OPENAI_API_KEY` | Embeddings + fallback | Yes |
 | `CHROMA_API_KEY` | ChromaDB Cloud | Yes |
 | `TENANT_CHROMA` | ChromaDB Cloud tenant | Yes |
-| `DATABASE_URL` | Supabase PostgreSQL (chat logging) | No |
 | `RESEND_API_KEY` | Resend email API | No |
 | `CONTACT_EMAIL` | Feedback destination | No |
 | `RAG_CONFIG_PATH` | Override config.yaml path | No |
@@ -198,7 +197,7 @@ The `TOOL_DECISION_SYSTEM_PROMPT` in `utils/prompts.py` contains:
 First-time setup (from `backend/` directory):
 
 ```bash
-python -m scripts.ingest
+uv sync --group ingest && uv run python scripts/01_llm_chunking_embedding/main.py
 ```
 
 Chunks handbook markdown → generates LLM headlines/summaries → embeds with `text-embedding-3-large` → stores in ChromaDB Cloud.

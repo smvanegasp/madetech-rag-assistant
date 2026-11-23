@@ -13,13 +13,13 @@ Required env: GROQ_API_KEY, OPENAI_API_KEY
 """
 
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from utils.models import Message, SourceChunk
 
-from utils.models import HandbookDoc
+from utils.models import HandbookDoc, Message, SourceChunk
+
 from .config_loader import load_config
 from .rag import get_chroma_collection
 from .rag.agent_pipeline import answer_question_agent, answer_question_agent_streamed
@@ -28,7 +28,7 @@ from .rag.keyword_search import HandbookBM25Index
 load_dotenv(override=True)
 
 
-def _history_to_messages(history: List[Message]) -> list[dict]:
+def _history_to_messages(history: list[Message]) -> list[dict]:
     """
     Convert Message objects to the dict format expected by the RAG pipeline.
 
@@ -89,9 +89,7 @@ class RAGService:
             f"with Chroma Cloud collection '{self.collection_name}'"
         )
 
-    def _extract_sources(
-        self, chunks: List[Any], max_sources: int = 15
-    ) -> List[SourceChunk]:
+    def _extract_sources(self, chunks: list[Any], max_sources: int = 15) -> list[SourceChunk]:
         """
         Convert retrieval Result objects to SourceChunk for the API response.
 
@@ -102,21 +100,13 @@ class RAGService:
         sources = []
         seen = set()
         for chunk in chunks:
-            meta = (
-                chunk.metadata
-                if hasattr(chunk, "metadata")
-                else chunk.get("metadata", {})
-            )
+            meta = chunk.metadata if hasattr(chunk, "metadata") else chunk.get("metadata", {})
             page = (
                 chunk.page_content
                 if hasattr(chunk, "page_content")
                 else chunk.get("page_content", "")
             )
-            doc_id = (
-                meta.get("doc_id")
-                or meta.get("id")
-                or meta.get("source_file", "unknown")
-            )
+            doc_id = meta.get("doc_id") or meta.get("id") or meta.get("source_file", "unknown")
             snippet = page.strip()
             if len(snippet) > 800:
                 truncate_at = snippet.rfind(".", 0, 800)
@@ -137,8 +127,8 @@ class RAGService:
     async def get_rag_response(
         self,
         query: str,
-        history: List[Message],
-    ) -> Dict[str, Any]:
+        history: list[Message],
+    ) -> dict[str, Any]:
         """
         Generate a RAG response: answer text plus source citations.
 
@@ -179,7 +169,7 @@ class RAGService:
     async def get_rag_response_streamed(
         self,
         query: str,
-        history: List[Message],
+        history: list[Message],
     ):
         """
         Async generator that yields SSE events as the agent processes the query.

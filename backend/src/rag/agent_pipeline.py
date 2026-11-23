@@ -19,10 +19,16 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from agents import Agent, Runner, function_tool, RunContextWrapper, OpenAIChatCompletionsModel
+from agents import Agent, OpenAIChatCompletionsModel, RunContextWrapper, Runner, function_tool
 from agents.stream_events import RunItemStreamEvent
 from openai import AsyncOpenAI, OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+from utils.models import Result
+from utils.prompts import RAG_ANSWERING_INSTRUCTIONS, TOOL_DECISION_SYSTEM_PROMPT
+
+from ..contact_service import send_contact_email
+from .pipeline import fetch_context
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +42,6 @@ def _get_groq_client() -> AsyncOpenAI:
     if _groq_client is None:
         _groq_client = AsyncOpenAI(base_url=GROQ_BASE_URL, api_key=os.getenv("GROQ_API_KEY"))
     return _groq_client
-
-from utils.models import Result
-from utils.prompts import TOOL_DECISION_SYSTEM_PROMPT, RAG_ANSWERING_INSTRUCTIONS
-
-from .pipeline import fetch_context
-from ..contact_service import send_contact_email
 
 
 @dataclass
@@ -126,8 +126,13 @@ def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str
                 ctx.context.config,
             )
         except Exception as e:
-            logger.warning("plan_searches: query %d/%d failed (%s: %s), skipping",
-                           i, len(queries), type(e).__name__, e)
+            logger.warning(
+                "plan_searches: query %d/%d failed (%s: %s), skipping",
+                i,
+                len(queries),
+                type(e).__name__,
+                e,
+            )
             failed_queries.append(query)
             continue
 
@@ -139,7 +144,9 @@ def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str
                 new_chunks.append(chunk)
         all_chunks.extend(new_chunks)
         if new_chunks:
-            results_parts.append(f"--- Search {i}: \"{query}\" ({len(new_chunks)} unique chunks) ---\n\n{_format_context(new_chunks)}")
+            results_parts.append(
+                f'--- Search {i}: "{query}" ({len(new_chunks)} unique chunks) ---\n\n{_format_context(new_chunks)}'
+            )
 
     ctx.context.retrieved_chunks.extend(all_chunks)
     combined = "\n\n".join(results_parts)
@@ -157,7 +164,9 @@ def plan_searches(ctx: RunContextWrapper[RAGContext], queries: list[str]) -> str
 def _validate_contact_fields(name: str, email: str, message: str) -> str | None:
     """Return an error message if any field is missing/placeholder, or None if valid."""
     if not name or name.lower() in ("unknown", "n/a", "user", "name"):
-        return "You don't have the user's name yet. Ask them for their name before calling this tool."
+        return (
+            "You don't have the user's name yet. Ask them for their name before calling this tool."
+        )
     if not email or "@" not in email:
         return "You don't have a valid email address yet. Ask the user for their email before calling this tool."
     if not message or len(message.strip()) < 5:
@@ -235,11 +244,13 @@ def _extract_tool_steps(result) -> list[dict]:
         if output_str.startswith("You don't have"):
             continue
 
-        steps.append({
-            "tool_name": tool_name,
-            "arguments": arguments,
-            "order": order,
-        })
+        steps.append(
+            {
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "order": order,
+            }
+        )
         order += 1
     return steps
 
@@ -298,9 +309,7 @@ async def answer_question_agent(
     if openai_client is None:
         openai_client = OpenAI()
     if collection is None:
-        raise ValueError(
-            "collection is required; use get_chroma_collection() to obtain it"
-        )
+        raise ValueError("collection is required; use get_chroma_collection() to obtain it")
 
     rag_context = RAGContext(
         collection=collection,
@@ -391,16 +400,15 @@ async def answer_question_agent_streamed(
         has_yielded = False
         try:
             async for event in result.stream_events():
-                if (
-                    isinstance(event, RunItemStreamEvent)
-                    and event.name == "tool_called"
-                ):
+                if isinstance(event, RunItemStreamEvent) and event.name == "tool_called":
                     try:
                         raw = event.item.raw_item
                         tool_name = getattr(raw, "name", "unknown")
                         arguments_str = getattr(raw, "arguments", "{}")
                         try:
-                            arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else {}
+                            arguments = (
+                                json.loads(arguments_str) if isinstance(arguments_str, str) else {}
+                            )
                         except (json.JSONDecodeError, TypeError):
                             arguments = {}
 
@@ -431,10 +439,17 @@ async def answer_question_agent_streamed(
             is_last_attempt = attempt == _STREAM_MAX_ATTEMPTS
 
             if has_yielded or is_last_attempt:
-                logger.error("Stream failed (attempt %d/%d, %s): %s",
-                             attempt, _STREAM_MAX_ATTEMPTS, type(e).__name__, e)
-                content = getattr(result, "final_output", None) or \
-                    "I encountered an issue processing your request. Please try again."
+                logger.error(
+                    "Stream failed (attempt %d/%d, %s): %s",
+                    attempt,
+                    _STREAM_MAX_ATTEMPTS,
+                    type(e).__name__,
+                    e,
+                )
+                content = (
+                    getattr(result, "final_output", None)
+                    or "I encountered an issue processing your request. Please try again."
+                )
                 yield {
                     "event": "done",
                     "data": {
@@ -447,6 +462,12 @@ async def answer_question_agent_streamed(
                 return
 
             delay = _STREAM_RETRY_BASE_DELAY * (2 ** (attempt - 1))
-            logger.warning("Stream attempt %d/%d failed (%s: %s), retrying in %ds...",
-                           attempt, _STREAM_MAX_ATTEMPTS, type(e).__name__, e, delay)
+            logger.warning(
+                "Stream attempt %d/%d failed (%s: %s), retrying in %ds...",
+                attempt,
+                _STREAM_MAX_ATTEMPTS,
+                type(e).__name__,
+                e,
+                delay,
+            )
             await asyncio.sleep(delay)

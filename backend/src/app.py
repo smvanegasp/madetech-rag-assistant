@@ -1,32 +1,40 @@
 """
 FastAPI application for the RAG handbook backend.
 
-Entry point for the backend. Exposes REST API and (in production) serves the frontend.
+Entry point for the backend. Exposes the REST API; on AWS the frontend is served by
+CloudFront from S3, and locally (or in a plain container) it can be served from FRONTEND_PATH.
 
 API Endpoints:
-- GET  /api/health     — Health check and document count
-- GET  /api/handbook   — All handbook documents (for source viewer)
-- POST /api/chat       — RAG chat (query + history → answer + sources)
+- GET  /api/health       — Health check and document count
+- GET  /api/handbook     — All handbook documents (for source viewer)
+- POST /api/contact      — Contact / feedback email
+- POST /api/chat         — RAG chat (query + history → answer + sources)
+- POST /api/chat/stream  — Same, as Server-Sent Events (tool steps live, then the answer)
 
 Request flow:
-  /api/chat → RAGService.get_rag_response() → rag.pipeline.answer_question()
+  /api/chat → RAGService.get_rag_response() → rag.agent_pipeline
 
-Required environment variables:
-- GROQ_API_KEY, OPENAI_API_KEY, DATABASE_URL
-- FRONTEND_PATH (optional, for production static serving)
+Environment variables (.env locally; SSM /nexus/ on AWS, see src/ssm.py):
+- GROQ_API_KEY, OPENAI_API_KEY, CHROMA_API_KEY, TENANT_CHROMA, RESEND_API_KEY, CONTACT_EMAIL
+- TABLE_NAME (AWS: chat logs + rate limits), ORIGIN_SECRET (AWS: only CloudFront may call)
+- FRONTEND_PATH (optional, for serving a built frontend from this server)
 """
 
+import asyncio
+import hmac
 import json
 import os
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from starlette.responses import StreamingResponse
+
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import StreamingResponse
 
 from utils.models import (
     ChatRequest,
@@ -35,25 +43,68 @@ from utils.models import (
     HandbookDoc,
     ToolStep,
 )
+
+from . import chat_logger, ratelimit, ssm
 from .config_loader import load_config
+from .contact_service import send_contact_email
 from .handbook_loader import load_handbook_documents
 from .rag_service import RAGService
-from . import chat_logger
-from .contact_service import send_contact_email
+from .settings import on_aws, origin_secret
 
 # Load environment variables from .env or .env.local
 load_dotenv()
 
-# Initialize FastAPI app with OpenAPI documentation
+# While the agent works, a comment line goes out this often so CloudFront (which drops a
+# response that is silent for its origin read timeout) keeps the stream open.
+HEARTBEAT_SECONDS = 15.0
+
+# Global state: Loaded at startup and cached in memory
+# These are read-only after initialization, so thread-safe
+handbook_docs: list[HandbookDoc] = []
+rag_service: RAGService | None = None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """
+    Initialize application state on server startup.
+
+    1. On AWS, loads the secrets from SSM into the environment
+    2. Loads all markdown handbook documents from data/handbook/
+    3. Initializes the RAG service (Chroma Cloud connection + BM25 index)
+
+    If any of this fails, the server fails to start.
+    """
+    global handbook_docs, rag_service
+    try:
+        ssm.load_parameters()
+
+        # Load all handbook documents (used by /api/handbook endpoint)
+        handbook_docs = load_handbook_documents()
+        print(f"✓ Loaded {len(handbook_docs)} handbook documents")
+
+        # Initialize RAG service with config (config.yaml in backend/)
+        config = load_config()
+        rag_service = RAGService(config=config, handbook_docs=handbook_docs)
+    except Exception as e:
+        print(f"✗ Error during startup: {e}")
+        raise
+    yield
+
+
 app = FastAPI(
     title="RAG Company Handbook API",
     description="Backend API for the RAG Company Handbook chatbot",
-    version="1.0.0"
+    version="1.0.0",
+    # Interactive API docs locally only; on AWS they would just map the API for strangers.
+    docs_url=None if on_aws() else "/docs",
+    redoc_url=None if on_aws() else "/redoc",
+    openapi_url=None if on_aws() else "/openapi.json",
+    lifespan=lifespan,
 )
 
-# CORS middleware for local development
-# Allows frontend dev server (Vite) to connect to backend
-# In production, frontend is served from same origin, so CORS not needed
+# CORS for running the Vite dev server against a backend on another port without its proxy.
+# On AWS the frontend and API share one origin (CloudFront), so CORS never applies.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
@@ -62,67 +113,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global state: Loaded at startup and cached in memory
-# These are read-only after initialization, so thread-safe
-handbook_docs: list[HandbookDoc] = []
-rag_service: RAGService = None
+
+@app.middleware("http")
+async def require_cloudfront(request: Request, call_next):
+    """On AWS only CloudFront may call the API: it adds X-Origin-Verify, and it is what sets
+    the viewer address header that rate limits trust."""
+    expected = origin_secret()
+    if expected and not hmac.compare_digest(
+        request.headers.get("x-origin-verify", "").encode(), expected.encode()
+    ):
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    return await call_next(request)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """
-    Initialize application state on server startup.
-    
-    This function runs once when the FastAPI server starts. It:
-    1. Loads all markdown handbook documents from data/handbook/
-    2. Initializes the RAG service with ChromaDB connection
-    3. Validates that the vector database exists
-    
-    If the vector database is missing, the server will fail to start.
-    To create it, run: python -m scripts.ingest
-    """
-    global handbook_docs, rag_service
+async def _with_heartbeat(events, interval: float):
+    """Yield the events of an async iterator, plus None whenever `interval` passes without one."""
+    iterator = events.__aiter__()
+    pending = asyncio.ensure_future(iterator.__anext__())
     try:
-        # Load all handbook documents (used by /api/handbook endpoint)
-        handbook_docs = load_handbook_documents()
-        print(f"✓ Loaded {len(handbook_docs)} handbook documents")
-        
-        # Initialize RAG service with config (config.yaml in backend/)
-        # Vector DB path comes from config; defaults to backend/data/vector_db
-        config = load_config()
-        rag_service = RAGService(config=config, handbook_docs=handbook_docs)
-    except Exception as e:
-        print(f"✗ Error during startup: {e}")
-        raise
+        while True:
+            done, _ = await asyncio.wait({pending}, timeout=interval)
+            if not done:
+                yield None
+                continue
+            try:
+                event = pending.result()
+            except StopAsyncIteration:
+                return
+            yield event
+            pending = asyncio.ensure_future(iterator.__anext__())
+    finally:
+        pending.cancel()
 
 
 @app.get("/api/health")
 async def health_check():
     """
     Health check endpoint.
-    
+
     Returns server status and the count of loaded handbook documents.
     Useful for monitoring, container orchestration, and debugging.
-    
+
     Returns:
         dict: {"status": "healthy", "documents_loaded": <count>}
     """
-    return {
-        "status": "healthy",
-        "documents_loaded": len(handbook_docs)
-    }
+    return {"status": "healthy", "documents_loaded": len(handbook_docs)}
 
 
 @app.get("/api/handbook")
 async def get_handbook():
     """
     Returns all handbook documents with metadata.
-    
+
     The frontend uses this to:
     - Display available documents in the source viewer
     - Match document IDs from citations to full content
     - Show document titles and categories
-    
+
     Returns:
         list[dict]: Array of HandbookDoc objects with id, title, category, content
     """
@@ -130,7 +177,7 @@ async def get_handbook():
 
 
 @app.post("/api/contact", status_code=204)
-async def contact(request: ContactRequest):
+async def contact(request: ContactRequest, http_request: Request):
     """
     Contact / feedback endpoint.
 
@@ -139,10 +186,14 @@ async def contact(request: ContactRequest):
 
     Returns 204 No Content on success.
     Raises:
+        HTTPException 429: If this visitor sent too many messages today.
         HTTPException 500: If the email could not be sent.
     """
+    if not await asyncio.to_thread(ratelimit.contact_allowed, http_request):
+        raise HTTPException(status_code=429, detail=ratelimit.CONTACT_LIMIT_MESSAGE)
     try:
-        send_contact_email(
+        await asyncio.to_thread(
+            send_contact_email,
             contact_type=request.contact_type,
             name=request.name,
             email=request.email,
@@ -150,29 +201,31 @@ async def contact(request: ContactRequest):
         )
     except Exception as e:
         print(f"Contact endpoint error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to send message. Please try again later.")
+        raise HTTPException(
+            status_code=500, detail="Failed to send message. Please try again later."
+        ) from e
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, http_request: Request):
     """
     RAG chat endpoint using Groq + ChromaDB.
-    
+
     This is the core RAG (Retrieval-Augmented Generation) endpoint that:
     1. Takes a user query and conversation history
     2. Performs semantic search in ChromaDB to find relevant handbook chunks
     3. Sends the retrieved context to Groq openai/gpt-oss-20b
     4. Returns the generated answer with source citations
-    
+
     The RAG service ensures all responses are grounded in actual handbook content.
     Uses Groq for primary generation with OpenAI as fallback.
-    
+
     Args:
         request (ChatRequest): Contains query string and message history
-        
+
     Returns:
         ChatResponse: Contains answer content and array of source citations
-        
+
     Raises:
         HTTPException 503: If vector database is not initialized
         HTTPException 500: If RAG processing fails
@@ -181,8 +234,8 @@ async def chat(request: ChatRequest):
         # Verify RAG service is initialized (requires vector DB)
         if rag_service is None:
             raise HTTPException(
-                status_code=503, 
-                detail="RAG service not initialized. Please ensure vector database is created."
+                status_code=503,
+                detail="RAG service not initialized. Please ensure vector database is created.",
             )
 
         # chat_id groups all messages in one conversation session.
@@ -191,15 +244,21 @@ async def chat(request: ChatRequest):
         interaction_id = str(uuid4())
         start_time = time.time()
 
+        # Daily caps: answered like a normal message so the UI shows it (and doesn't retry).
+        if not await asyncio.to_thread(ratelimit.chat_allowed, http_request):
+            return ChatResponse(
+                content=ratelimit.CHAT_LIMIT_MESSAGE,
+                sources=[],
+                chat_id=chat_id,
+                interaction_id=interaction_id,
+            )
+
         # Perform RAG query: retrieve context + generate response
-        result = await rag_service.get_rag_response(
-            query=request.query,
-            history=request.history
-        )
+        result = await rag_service.get_rag_response(query=request.query, history=request.history)
 
         response_time_ms = int((time.time() - start_time) * 1000)
 
-        chat_logger.log_message(
+        await chat_logger.log_message_async(
             interaction_id=interaction_id,
             chat_id=chat_id,
             user_message=request.query,
@@ -219,16 +278,17 @@ async def chat(request: ChatRequest):
         )
     except Exception as e:
         print(f"Chat endpoint error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, http_request: Request):
     """
     Streaming chat endpoint using Server-Sent Events.
 
     Sends tool_step events as the agent processes, then a final done event
-    with the full answer, sources, and tool steps.
+    with the full answer, sources, and tool steps. While nothing else is sent, a
+    ": ping" comment line goes out every HEARTBEAT_SECONDS (clients ignore it).
     """
     if rag_service is None:
         raise HTTPException(
@@ -240,14 +300,38 @@ async def chat_stream(request: ChatRequest):
     interaction_id = str(uuid4())
     start_time = time.time()
 
+    if not await asyncio.to_thread(ratelimit.chat_allowed, http_request):
+        # Daily caps: a normal (non-error) answer, so the UI shows it and doesn't retry.
+        payload = {
+            "content": ratelimit.CHAT_LIMIT_MESSAGE,
+            "sources": [],
+            "tool_steps": [],
+            "chat_id": chat_id,
+            "interaction_id": interaction_id,
+        }
+
+        async def limited():
+            yield f"event: done\ndata: {json.dumps(payload)}\n\n"
+
+        return StreamingResponse(
+            limited(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     async def event_generator():
         final_content = ""
         try:
-            async for event in rag_service.get_rag_response_streamed(
-                query=request.query,
-                history=request.history,
+            async for event in _with_heartbeat(
+                rag_service.get_rag_response_streamed(
+                    query=request.query,
+                    history=request.history,
+                ),
+                HEARTBEAT_SECONDS,
             ):
-                if event["event"] == "tool_step":
+                if event is None:
+                    yield ": ping\n\n"
+                elif event["event"] == "tool_step":
                     yield f"event: tool_step\ndata: {json.dumps(event['data'])}\n\n"
                 elif event["event"] == "done":
                     data = event["data"]
@@ -275,7 +359,7 @@ async def chat_stream(request: ChatRequest):
             yield f"event: done\ndata: {json.dumps(payload)}\n\n"
         finally:
             response_time_ms = int((time.time() - start_time) * 1000)
-            chat_logger.log_message(
+            await chat_logger.log_message_async(
                 interaction_id=interaction_id,
                 chat_id=chat_id,
                 user_message=request.query,
@@ -311,21 +395,21 @@ frontend_path = os.getenv("FRONTEND_PATH", "/app/frontend/dist")
 if os.path.exists(frontend_path):
     # Mount static assets (JS, CSS, images) at /assets
     app.mount("/assets", StaticFiles(directory=f"{frontend_path}/assets"), name="assets")
-    
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """
         Catch-all route for serving the React frontend.
-        
+
         This enables client-side routing (React Router):
         - If a file exists at the requested path, serve it
         - Otherwise, serve index.html and let React handle routing
-        
+
         Must be defined AFTER all API routes, otherwise it would catch /api/* requests.
-        
+
         Args:
             full_path: Any path that didn't match an API route
-            
+
         Returns:
             FileResponse: Either the requested file or index.html
         """
@@ -333,13 +417,13 @@ if os.path.exists(frontend_path):
         file_path = Path(frontend_path) / full_path
         if file_path.is_file():
             return FileResponse(file_path)
-        
+
         # Fall back to index.html for client-side routing
         # React Router will handle the actual route
         index_path = Path(frontend_path) / "index.html"
         if index_path.is_file():
             return FileResponse(index_path)
-        
+
         raise HTTPException(status_code=404, detail="Not found")
 else:
     print(f"[WARNING] Frontend path not found: {frontend_path}. Running in API-only mode.")
