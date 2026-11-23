@@ -10,7 +10,7 @@ Defines data structures used across the pipeline and API:
 """
 
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -98,18 +98,14 @@ class Chunks(BaseModel):
 class QAPair(BaseModel):
     """A single question-answer pair derived from handbook content."""
 
-    question: str = Field(
-        description="A question that can be asked in a search engine style"
-    )
-    answer: str = Field(
-        description="A concise factual answer to the question based on the context"
-    )
+    question: str = Field(description="A question that can be asked in a search engine style")
+    answer: str = Field(description="A concise factual answer to the question based on the context")
 
 
 class QAPairList(BaseModel):
     """A list of question-answer pairs (e.g. for structured LLM output)."""
 
-    pairs: List[QAPair] = Field(description="A list of question-answer pairs")
+    pairs: list[QAPair] = Field(description="A list of question-answer pairs")
 
 
 # Type aliases for QA evaluation
@@ -125,7 +121,7 @@ class QAPairWithTS(QAPair):
     """
 
     question_type: QuestionType
-    doc_metadata: List[HandbookDocMetadata] = Field(
+    doc_metadata: list[HandbookDocMetadata] = Field(
         description="Metadata of source document(s). Single-source: 1 element; multi-source: 2-3 elements."
     )
 
@@ -155,7 +151,7 @@ class QAPairEvalRecord(QAPairWithTS):
     and standalone dimensions.
     """
 
-    critiques: List[QuestionCritiqueWithType] = Field(
+    critiques: list[QuestionCritiqueWithType] = Field(
         description="Critique scores across evaluation dimensions"
     )
 
@@ -199,8 +195,8 @@ class Message(BaseModel):
     id: str
     role: str  # 'user' or 'assistant'
     content: str
-    sources: Optional[List[SourceChunk]] = None
-    timestamp: Optional[datetime] = None
+    sources: list[SourceChunk] | None = None
+    timestamp: datetime | None = None
 
 
 class ContactRequest(BaseModel):
@@ -216,8 +212,8 @@ class ChatRequest(BaseModel):
     """Request payload for the chat endpoint."""
 
     query: str
-    history: List[Message] = []
-    chat_id: Optional[str] = None
+    history: list[Message] = []
+    chat_id: str | None = None
 
 
 class ToolStep(BaseModel):
@@ -232,9 +228,7 @@ class ChatResponse(BaseModel):
     """Response from the chat endpoint."""
 
     content: str
-    sources: List[SourceChunk]
+    sources: list[SourceChunk]
     chat_id: str
     interaction_id: str
-    tool_steps: Optional[List[ToolStep]] = None
-
-
+    tool_steps: list[ToolStep] | None = None

@@ -375,3 +375,12 @@ vite.config.ts.timestamp-*
 
 experiments_db/
 output/
+#----------------------------------------------------------
+# Terraform
+#----------------------------------------------------------
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+# Terraform values like the alert email
+*.tfvars

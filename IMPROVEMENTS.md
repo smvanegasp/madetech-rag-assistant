@@ -79,7 +79,7 @@
 ### 4.2 Repository & Documentation
 
 - [ ] **[CLAUDE-CODE]** Improve the README: update with current architecture (Agents SDK, hybrid search, SSE streaming), setup instructions, screenshots, and links to the live app.
-- [ ] **[COLLAB]** Set up CI/CD: GitHub Actions → build → deploy to AWS App Runner or HuggingFace. Choose the pipeline, Claude Code writes the workflow files.
+- [x] **[COLLAB]** Set up CI/CD: GitHub Actions CI + OIDC deploy to Lambda/CloudFront (Terraform in infra/, see AGENTS.md §5).
 
 ### 4.3 Infrastructure
 

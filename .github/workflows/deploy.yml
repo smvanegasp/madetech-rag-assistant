@@ -1,0 +1,98 @@
+name: Deploy
+
+# After CI passes on main (that is, after a merge), deploy everything to AWS: the API image,
+# the infrastructure (`terraform apply`, which also rolls Lambda to the new image), then the
+# frontend. PRs show the Terraform plan first (ci.yml, job "infra-plan").
+#
+# The job runs once the repository variable DEPLOY_ENABLED is "true" and ALERT_EMAIL is set
+# (GitHub > Settings > Secrets and variables > Actions > Variables). No AWS keys are stored in
+# GitHub; the workflow assumes an IAM role through OIDC (infra/github.tf). The very first deploy
+# is done locally with scripts/deploy.sh, because that is what creates the role (AGENTS.md §5).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time, in order (Terraform also locks its state).
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ROLE_ARN: arn:aws:iam::816940506502:role/nexus-github-deploy
+  REPOSITORY: nexus-api
+  TF_IN_AUTOMATION: "1"
+  TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+
+jobs:
+  deploy:
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+      )
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      # Logged-in pulls of the Lambda Web Adapter image avoid public ECR's anonymous rate limit.
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: Build and push the API image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/nexus-api
+        run: |
+          # Lambda wants a plain single-platform image (no provenance/SBOM attestations).
+          docker build --platform linux/amd64 --provenance=false --sbom=false --target lambda \
+            -t "$IMAGE:latest" -t "$IMAGE:$SHA" backend
+          docker push --all-tags "$IMAGE"
+
+      # Terraform reads the ":latest" digest just pushed, so this also rolls Lambda to it.
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - name: Terraform apply
+        run: |
+          terraform -chdir=infra init -input=false
+          terraform -chdir=infra apply -input=false -auto-approve
+
+      - name: Read the deployed addresses
+        id: tf
+        run: |
+          echo "bucket=$(terraform -chdir=infra output -raw web_bucket)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(terraform -chdir=infra output -raw distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "site=$(terraform -chdir=infra output -raw site_url)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the frontend
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Upload the frontend
+        run: scripts/upload_frontend.sh "${{ steps.tf.outputs.bucket }}" "${{ steps.tf.outputs.distribution }}"
+
+      - name: Check the API answers through CloudFront
+        run: curl -fsS --retry 5 --retry-all-errors --retry-delay 3 "${{ steps.tf.outputs.site }}/api/health"

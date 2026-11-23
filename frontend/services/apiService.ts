@@ -5,14 +5,11 @@
  */
 
 import { Message, HandbookDoc, ToolStep } from '../types';
+import { createSseParser } from './sse';
 
-// Determine API URL based on environment:
-// - If VITE_BACKEND_URL is explicitly set, use it (can be set to empty string for same-origin)
-// - If in production and no VITE_BACKEND_URL, use empty string for relative URLs
-// - Otherwise, default to localhost:9481 for local development
-const API_URL = import.meta.env.VITE_BACKEND_URL !== undefined
-  ? import.meta.env.VITE_BACKEND_URL
-  : (import.meta.env.PROD ? '' : 'http://localhost:9481');
+// Same origin by default: CloudFront serves the app and /api on AWS, and the Vite dev server
+// proxies /api to the backend locally (vite.config.ts). VITE_BACKEND_URL overrides it.
+const API_URL = import.meta.env.VITE_BACKEND_URL ?? '';
 
 /**
  * Fetches all handbook documents from the backend.
@@ -67,7 +64,7 @@ export async function getHandbookResponseStreamed(
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
+    const parse = createSseParser();
     let finalResult: any = null;
 
     // Queue tool steps and reveal them with a staggered delay
@@ -87,32 +84,23 @@ export async function getHandbookResponseStreamed(
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      let eventType = '';
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          eventType = line.slice(7).trim();
-        } else if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.slice(6));
-          if (eventType === 'tool_step') {
-            const step = data as ToolStep;
-            // Expand plan_searches into individual steps for staggered display
-            if (step.tool_name === 'plan_searches' && Array.isArray(step.arguments?.queries)) {
-              for (const q of step.arguments.queries as string[]) {
-                stepOrder++;
-                stepQueue.push({ tool_name: 'search_handbook', arguments: { query: q }, order: stepOrder });
-              }
-            } else {
+      for (const sse of parse(decoder.decode(value, { stream: true }))) {
+        const data = JSON.parse(sse.data);
+        if (sse.event === 'tool_step') {
+          const step = data as ToolStep;
+          // Expand plan_searches into individual steps for staggered display
+          if (step.tool_name === 'plan_searches' && Array.isArray(step.arguments?.queries)) {
+            for (const q of step.arguments.queries as string[]) {
               stepOrder++;
-              stepQueue.push({ ...step, order: stepOrder });
+              stepQueue.push({ tool_name: 'search_handbook', arguments: { query: q }, order: stepOrder });
             }
-            await flushStepQueue();
-          } else if (eventType === 'done') {
-            finalResult = data;
+          } else {
+            stepOrder++;
+            stepQueue.push({ ...step, order: stepOrder });
           }
+          await flushStepQueue();
+        } else if (sse.event === 'done') {
+          finalResult = data;
         }
       }
     }

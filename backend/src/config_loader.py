@@ -80,7 +80,11 @@ def _default_config() -> dict:
     """
     vector_db_path = (_BACKEND_ROOT / "data" / "vector_db").resolve()
     return {
-        "vector_db": {"path": str(vector_db_path), "collection_name": "docs"},
+        "vector_db": {
+            "path": str(vector_db_path),
+            "database": "madetech_handbook",
+            "collection_name": "docs",
+        },
         "embedding_model": "text-embedding-3-large",
         "retrieval": {"retrieval_k": 20, "final_k": 10},
         "model": "groq/openai/gpt-oss-20b",

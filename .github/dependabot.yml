@@ -1,0 +1,29 @@
+# Weekly updates. Minor and patch updates come grouped in one PR per ecosystem (safe to merge
+# when CI is green); major versions come as their own PRs, to test before merging.
+# CI runs on each; merging deploys (once DEPLOY_ENABLED is on).
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /backend
+    schedule: { interval: weekly }
+    groups: { python: { patterns: ["*"], update-types: [minor, patch] } }
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+    groups: { npm: { patterns: ["*"], update-types: [minor, patch] } }
+  - package-ecosystem: docker
+    directory: /backend
+    schedule: { interval: weekly }
+    groups: { docker: { patterns: ["*"], update-types: [minor, patch] } }
+    ignore:
+      # The backend targets Python 3.12 (pyproject requires-python); upgrade it on purpose.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups: { actions: { patterns: ["*"], update-types: [minor, patch] } }
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule: { interval: weekly }
+    groups: { terraform: { patterns: ["*"], update-types: [minor, patch] } }

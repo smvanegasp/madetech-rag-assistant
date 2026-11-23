@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { X, Send, CheckCircle } from 'lucide-react';
 import { Theme } from '../types';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL !== undefined
-  ? import.meta.env.VITE_BACKEND_URL
-  : (import.meta.env.PROD ? '' : 'http://localhost:9481');
+const API_URL = import.meta.env.VITE_BACKEND_URL ?? '';
 
 interface ContactModalProps {
   isOpen: boolean;

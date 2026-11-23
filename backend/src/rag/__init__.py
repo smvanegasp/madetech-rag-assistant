@@ -1,6 +1,7 @@
 """RAG pipeline with query rewriting and reranking."""
 
 from utils.models import Result
+
 from .agent_pipeline import answer_question_agent
 from .pipeline import answer_question, fetch_context
 from .query_rewriting import rewrite_query

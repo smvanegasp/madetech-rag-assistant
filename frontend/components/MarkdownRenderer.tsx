@@ -158,6 +158,21 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           {process(children)}
         </blockquote>
       ),
+      code: ({ children, className }: any) => {
+        const isBlock = typeof className === 'string' && className.startsWith('language-');
+        if (isBlock) {
+          return (
+            <code className={`${className} ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
+              {children}
+            </code>
+          );
+        }
+        return (
+          <code className={`px-1.5 py-0.5 rounded text-sm font-mono ${isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-zinc-200 text-zinc-800'}`}>
+            {process(children)}
+          </code>
+        );
+      },
       a: ({ href, children }: any) => (
         <a
           href={href}

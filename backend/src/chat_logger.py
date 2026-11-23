@@ -1,25 +1,20 @@
-"""Chat message logger — persists each user/LLM interaction to Supabase (PostgreSQL).
+"""Chat message logger: stores each user/LLM interaction in DynamoDB.
 
-Reads DATABASE_URL from the environment. All errors are caught and logged
-to stdout so that a DB failure never breaks the /api/chat endpoint.
+One item per interaction: pk = CHAT#<chat_id>, sk = MSG#<iso timestamp>#<interaction_id>,
+expiring after CHAT_LOG_DAYS through the table's TTL. Read a conversation back with a Query on
+its pk. Off when TABLE_NAME is unset (local dev). Errors are logged, never raised, so logging
+can't break a chat.
 """
 
+import asyncio
 import logging
-import os
-from datetime import datetime, timezone
+import time
+from datetime import UTC, datetime
 
-import psycopg2
+from . import db
+from .settings import CHAT_LOG_DAYS, table_name
 
 logger = logging.getLogger(__name__)
-
-def _get_connection():
-    """Open and return a new psycopg2 connection for the current call."""
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise ValueError("DATABASE_URL environment variable not set")
-    conn = psycopg2.connect(database_url)
-    conn.autocommit = True
-    return conn
 
 
 def log_message(
@@ -29,32 +24,28 @@ def log_message(
     llm_response: str,
     response_time_ms: int,
 ) -> None:
-    """Insert one interaction row into chat_messages.
-
-    Never raises — errors are logged so the chat endpoint is never broken
-    by a database failure.
-    """
-    conn = None
+    """Store one interaction. Never raises."""
+    if not table_name():
+        return
+    timestamp = datetime.now(UTC).isoformat()
     try:
-        conn = _get_connection()
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO chat_messages
-                    (interaction_id, chat_id, timestamp, user_message, llm_response, response_time_ms)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    interaction_id,
-                    chat_id,
-                    datetime.now(timezone.utc),
-                    user_message,
-                    llm_response,
-                    response_time_ms,
-                ),
-            )
+        db.get_table().put_item(
+            Item={
+                "pk": f"CHAT#{chat_id}",
+                "sk": f"MSG#{timestamp}#{interaction_id}",
+                "interaction_id": interaction_id,
+                "chat_id": chat_id,
+                "timestamp": timestamp,
+                "user_message": user_message,
+                "llm_response": llm_response,
+                "response_time_ms": response_time_ms,
+                "ttl": int(time.time()) + CHAT_LOG_DAYS * 86400,
+            }
+        )
     except Exception as e:
         logger.error("Failed to log chat message: %s", e)
-    finally:
-        if conn is not None:
-            conn.close()
+
+
+async def log_message_async(**kwargs) -> None:
+    """log_message off the event loop, so a slow write never stalls other requests."""
+    await asyncio.to_thread(log_message, **kwargs)
