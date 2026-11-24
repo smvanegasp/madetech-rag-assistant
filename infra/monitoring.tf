@@ -1,5 +1,5 @@
-# Email alerts: the API crashing or throttled, chats failing, and the daily caps being hit.
-# Free at this size (CloudWatch's first 10 alarms and metrics, SNS's first 1,000 emails).
+# Email alerts: chats failing, contact email failing, and the API crashing, throttled or slow.
+# 5 alarms and 2 custom metrics; the account shares 10 free of each across Sergio's apps.
 
 variable "alert_email" {
   description = "Where alerts go. Locally infra/terraform.tfvars (git-ignored); in CI the ALERT_EMAIL repo variable."
@@ -20,13 +20,13 @@ resource "aws_sns_topic_subscription" "alerts_email" {
 }
 
 locals {
-  # Stable log lines from the API (backend/src/app.py, ratelimit.py, chat_logger.py).
+  # Stable log lines from the API (backend/src/app.py). Each filter is a custom metric, and the
+  # account's first 10 are free across all of Sergio's apps (then $0.30/month each), so only the
+  # two that page someone are kept. Other lines ("Chat rate limit reached (global)", "Failed to
+  # log chat message") are still searchable in the logs.
   log_signals = {
-    StreamError      = "\"Stream error\""
-    ChatError        = "\"Chat endpoint error\""
-    ContactError     = "\"Contact endpoint error\""
-    ChatLogFailed    = "\"Failed to log chat message\""
-    GlobalCapReached = "\"Chat rate limit reached (global)\""
+    StreamError  = "\"Stream error\""
+    ContactError = "\"Contact endpoint error\""
   }
 }
 
@@ -66,21 +66,6 @@ resource "aws_cloudwatch_metric_alarm" "contact_failing" {
   metric_name         = "ContactError"
   statistic           = "Sum"
   period              = 900
-  evaluation_periods  = 1
-  threshold           = 1
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  depends_on          = [aws_cloudwatch_log_metric_filter.signals]
-}
-
-resource "aws_cloudwatch_metric_alarm" "global_cap" {
-  alarm_name          = "${local.name}-daily-cap-reached"
-  alarm_description   = "The global daily chat cap (CHATS_PER_DAY) was reached: visitors get the come-back-tomorrow message until midnight UTC."
-  namespace           = "Nexus"
-  metric_name         = "GlobalCapReached"
-  statistic           = "Sum"
-  period              = 3600
   evaluation_periods  = 1
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"

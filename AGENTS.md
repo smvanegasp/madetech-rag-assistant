@@ -97,7 +97,7 @@ git-ignored `infra/terraform.tfvars` (`alert_email = "..."`).
   `backend/src/ssm.py`. Set them with `cd backend && uv run python ../scripts/set_aws_secrets.py`
   (reads `.env`, asks for anything missing, restarts the Lambda). Never print them.
 - **Alarms** (SNS `nexus-alerts` -> email, after the subscription is confirmed): chats failing
-  ("Stream error" log line, 3+ in 15 min), contact email failing, the global daily cap reached,
+  ("Stream error" log line, 3+ in 15 min), contact email failing,
   Lambda errors, throttles, and slow requests (p90 > 60s). Keep those log lines stable.
 - **Chat logs:** DynamoDB items `pk=CHAT#<chat_id>`, `sk=MSG#<iso time>#<interaction_id>` with
   `user_message`, `llm_response`, `response_time_ms`; deleted by TTL after 180 days.
