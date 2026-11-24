@@ -117,3 +117,22 @@ def test_contact_daily_cap(client, monkeypatch):
     assert client.post("/api/contact", json=body).status_code == 204
     assert client.post("/api/contact", json=body).status_code == 429
     assert len(sent) == 1
+
+
+def test_contact_email_escapes_visitor_input(monkeypatch):
+    from src import contact_service
+
+    sent = []
+    monkeypatch.setenv("RESEND_API_KEY", "test")
+    monkeypatch.setenv("CONTACT_EMAIL", "me@example.com")
+    monkeypatch.setattr(contact_service.resend.Emails, "send", lambda params: sent.append(params))
+    contact_service.send_contact_email(
+        contact_type="feedback",
+        name="Eve\nBcc: x@evil.test <b>",
+        email="eve@example.com",
+        message='<a href="https://evil.test">click</a><script>alert(1)</script>',
+    )
+    html, subject = sent[0]["html"], sent[0]["subject"]
+    assert "<script>" not in html and '<a href="https://evil.test">' not in html
+    assert "&lt;script&gt;" in html
+    assert "\n" not in subject

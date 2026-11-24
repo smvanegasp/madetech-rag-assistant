@@ -5,6 +5,7 @@ Errors are raised so the /api/contact endpoint can return a meaningful HTTP erro
 """
 
 import os
+from html import escape
 
 import resend
 
@@ -34,27 +35,34 @@ def send_contact_email(
     resend.api_key = api_key
 
     subject_prefix = "Feedback" if contact_type == "feedback" else "Get in Touch"
-    subject = f"[MadeTech RAG Assistant] {subject_prefix} from {name}"
+    # A visitor's name must not add lines to the subject.
+    one_line_name = " ".join(name.split())
+    subject = f"[MadeTech RAG Assistant] {subject_prefix} from {one_line_name}"
+
+    # Everything a visitor typed is escaped, so it shows as text and can't inject HTML or
+    # links into the email.
+    e_subject, e_type = escape(subject), escape(contact_type.title())
+    e_name, e_email, e_message = escape(name), escape(email), escape(message)
 
     html_body = f"""
     <div style="font-family: sans-serif; max-width: 600px;">
-      <h2 style="color: #10b981;">{subject}</h2>
+      <h2 style="color: #10b981;">{e_subject}</h2>
       <table style="border-collapse: collapse; width: 100%;">
         <tr>
           <td style="padding: 8px 0; font-weight: bold; color: #6b7280; width: 80px;">Type</td>
-          <td style="padding: 8px 0;">{contact_type.title()}</td>
+          <td style="padding: 8px 0;">{e_type}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; font-weight: bold; color: #6b7280;">Name</td>
-          <td style="padding: 8px 0;">{name}</td>
+          <td style="padding: 8px 0;">{e_name}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; font-weight: bold; color: #6b7280;">Email</td>
-          <td style="padding: 8px 0;"><a href="mailto:{email}">{email}</a></td>
+          <td style="padding: 8px 0;"><a href="mailto:{e_email}">{e_email}</a></td>
         </tr>
       </table>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-      <p style="white-space: pre-wrap; color: #374151;">{message}</p>
+      <p style="white-space: pre-wrap; color: #374151;">{e_message}</p>
     </div>
     """
 

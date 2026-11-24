@@ -25,7 +25,7 @@ import WelcomeModal from './components/WelcomeModal';
 import ContactModal from './components/ContactModal';
 import { Chat, Message, SourceChunk, ToolStep, SelectedSource, ViewMode, Theme, UserProfile, HandbookDoc } from './types';
 import { getHandbookResponseStreamed, getHandbookDocs } from './services/apiService';
-import { PanelRight, MessageCircleHeart } from 'lucide-react';
+import { PanelRight, MessageCircleHeart, ArrowLeft } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- UI STATE ---
@@ -33,14 +33,21 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [sourceViewerOpen, setSourceViewerOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<SelectedSource | null>(null);
-  const [showWelcome, setShowWelcome] = useState<boolean>(
-    () => !localStorage.getItem('welcomeSeen')
-  );
+  const [showWelcome, setShowWelcome] = useState<boolean>(() => {
+    try { return !localStorage.getItem('welcomeSeen'); } catch { return true; }
+  });
+  // Opened by itself on the first visit: closes by itself. Reopened from the button: stays.
+  const [welcomeAuto, setWelcomeAuto] = useState<boolean>(showWelcome);
   const [showContact, setShowContact] = useState(false);
 
   const handleCloseWelcome = useCallback(() => {
-    localStorage.setItem('welcomeSeen', '1');
+    try { localStorage.setItem('welcomeSeen', '1'); } catch { /* shown again next visit; fine */ }
     setShowWelcome(false);
+  }, []);
+
+  const handleOpenWelcome = useCallback(() => {
+    setWelcomeAuto(false);
+    setShowWelcome(true);
   }, []);
 
   // --- DATA STATE ---
@@ -393,9 +400,9 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col h-full relative min-w-0">
         <header className={`h-14 flex items-center px-4 shrink-0 z-30 transition-colors
           ${isDark ? 'bg-zinc-900/50 backdrop-blur border-b border-zinc-800' : 'bg-white/80 backdrop-blur border-b border-zinc-100'}`}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {!sidebarOpen && (
-              <button 
+              <button
                 onClick={() => setSidebarOpen(true)}
                 aria-label="Expand sidebar"
                 className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}
@@ -403,6 +410,18 @@ const App: React.FC = () => {
                 <PanelRight size={18} />
               </button>
             )}
+            {/* Back to Sergio's portfolio: always in the header, so it's there on phones too
+                (the sidebar starts closed there). Icon only on small screens. */}
+            <a
+              href="https://sergiovanegas.com/projects/"
+              aria-label="Back to Sergio's projects"
+              title="Back to Sergio's projects"
+              className={`flex items-center gap-1.5 p-2 sm:px-2.5 rounded-lg text-xs font-medium transition-all
+                ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-zinc-100 text-zinc-500 hover:text-zinc-800'}`}
+            >
+              <ArrowLeft size={16} />
+              <span className="hidden sm:inline">Projects</span>
+            </a>
           </div>
           <div className="flex-1 flex justify-center px-4 sm:px-8">
             <div className={`text-sm font-semibold tracking-tight ${isDark ? 'text-zinc-400' : 'text-zinc-500'} truncate max-w-[150px] sm:max-w-md`}>
@@ -433,7 +452,7 @@ const App: React.FC = () => {
             onOpenSource={handleOpenSource}
             theme={theme}
             handbookDocs={handbookDocs}
-            onOpenDisclaimer={() => setShowWelcome(true)}
+            onOpenDisclaimer={handleOpenWelcome}
           />
         </div>
 
@@ -474,6 +493,7 @@ const App: React.FC = () => {
 
       <WelcomeModal
         isOpen={showWelcome}
+        auto={welcomeAuto}
         onClose={handleCloseWelcome}
         theme={theme}
       />
