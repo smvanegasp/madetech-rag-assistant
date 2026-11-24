@@ -414,8 +414,10 @@ const App: React.FC = () => {
                 (the sidebar starts closed there). Icon only on small screens. */}
             <a
               href="https://sergiovanegas.com/projects/"
-              aria-label="Back to Sergio's projects"
-              title="Back to Sergio's projects"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Sergio's projects (opens in a new tab)"
+              title="Sergio's projects (opens in a new tab)"
               className={`flex items-center gap-1.5 p-2 sm:px-2.5 rounded-lg text-xs font-medium transition-all
                 ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-zinc-100 text-zinc-500 hover:text-zinc-800'}`}
             >
