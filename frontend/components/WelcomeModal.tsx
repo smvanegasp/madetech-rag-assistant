@@ -114,7 +114,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, auto, onClose, them
             <span>·</span>
             <a href="https://github.com/smvanegasp/madetech-rag-assistant" target="_blank" rel="noopener noreferrer" className={link}>View source code</a>
             <span>·</span>
-            <a href="https://sergiovanegas.com/projects/" className={link}>More projects</a>
+            <a href="https://sergiovanegas.com/projects/" target="_blank" rel="noopener noreferrer" className={link}>More projects</a>
           </div>
 
           <div className={`rounded-xl p-4 text-xs space-y-2.5 ${isDark ? 'bg-zinc-800/60 text-zinc-400' : 'bg-zinc-50 text-zinc-500'}`}>
